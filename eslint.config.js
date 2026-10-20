@@ -18,8 +18,14 @@ export default defineConfig([
     languageOptions: {
       globals: globals.browser,
     },
-    rules: {
-      'react-refresh/only-export-components': 'off',
-    },
+  },
+  {
+    /*
+     * shadcn/ui files export variant helpers next to their components, which trips the fast
+     * refresh rule. The template switched the rule off for the whole project; scoped here it
+     * still protects everything we write ourselves.
+     */
+    files: ['src/components/ui/**/*.tsx'],
+    rules: { 'react-refresh/only-export-components': 'off' },
   },
 ])
