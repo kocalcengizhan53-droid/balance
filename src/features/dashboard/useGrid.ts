@@ -1,5 +1,6 @@
-import { useCallback, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 
+import { publishGridState } from "@/devtools"
 import { solve, type Period } from "@/lib/grid/dispatch"
 import { PERIODS } from "@/lib/grid/profiles"
 import { UNITS } from "@/lib/grid/units"
@@ -16,6 +17,8 @@ export function useGrid() {
   const [period, setPeriod] = useState(36) // 18:00 — the evening peak, where the day is hardest
 
   const solution = solve(offline)
+
+  useEffect(() => publishGridState(offline, period), [offline, period])
 
   const toggle = useCallback((id: string) => {
     setOffline((current) =>

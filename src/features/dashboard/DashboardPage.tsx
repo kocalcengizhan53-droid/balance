@@ -41,7 +41,10 @@ export function DashboardPage() {
         rest of the dashboard about something. Everything else is a tile.
       */}
       <section className="mt-6 grid gap-3 lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)]">
-        <div className="rounded-lg border border-border/70 bg-card px-5 py-4">
+        <div
+          data-figure="Carbon intensity"
+          className="rounded-lg border border-border/70 bg-card px-5 py-4"
+        >
           <p className="text-xs font-medium text-muted-foreground">
             Carbon intensity, now
           </p>

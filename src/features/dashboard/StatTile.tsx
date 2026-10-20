@@ -19,7 +19,10 @@ export function StatTile({
   tone?: "normal" | "warning"
 }) {
   return (
-    <div className="rounded-lg border border-border/70 bg-card px-4 py-3">
+    <div
+      data-figure={label}
+      className="rounded-lg border border-border/70 bg-card px-4 py-3"
+    >
       <p className="text-xs font-medium text-muted-foreground">{label}</p>
       <p className="mt-1.5 flex items-baseline gap-1.5">
         <span
