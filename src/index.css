@@ -156,9 +156,18 @@
 }
 
 .dark {
-  /* The same eight hues stepped for the dark surface, not an automatic flip. */
+  /*
+   * The same eight hues stepped for the dark surface, not an automatic flip.
+   *
+   * Wind is a step darker here than in the light theme. Carried over unchanged it sat at
+   * ΔE 6.9 from solar under protanopia — inside the 6–8 floor band, where a pair is only
+   * legal with secondary encoding, and this one is a band in a stacked area. No amber inside
+   * the dark lightness band could open that gap, because under protanopia green and orange
+   * both reduce to yellow and lightness is the only axis left. So the green moved instead,
+   * and the worst adjacent pair is now gas against biomass at ΔE 9.4.
+   */
   --fuel-nuclear: #d55181;
-  --fuel-wind: #008300;
+  --fuel-wind: #007715;
   --fuel-solar: #c98500;
   --fuel-hydro: #3987e5;
   --fuel-biomass: #199e70;

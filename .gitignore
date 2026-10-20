@@ -32,3 +32,8 @@ dist-ssr
 qa-output/
 
 qa-output/
+
+# wrangler files
+.wrangler
+.dev.vars*
+!.dev.vars.example
