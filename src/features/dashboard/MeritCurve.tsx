@@ -1,3 +1,4 @@
+import { useElementWidth } from "@/components/use-element-width"
 import { fuelVar, type Series } from "@/lib/viz/fuel"
 import type { Period } from "@/lib/grid/dispatch"
 import { INTERCONNECTOR } from "@/lib/grid/units"
@@ -15,12 +16,15 @@ import { periodLabel } from "@/lib/grid/profiles"
  * is what the half-hour cost to serve.
  */
 
-const W = 560
-const H = 220
 const PAD = { top: 14, right: 12, bottom: 26, left: 40 }
-const PLOT = { w: W - PAD.left - PAD.right, h: H - PAD.top - PAD.bottom }
 
-type Step = { label: string; fuel: Series; cost: number; from: number; to: number }
+type Step = {
+  label: string
+  fuel: Series
+  cost: number
+  from: number
+  to: number
+}
 
 function steps(now: Period): Step[] {
   const dispatchable = now.outputs
@@ -36,7 +40,12 @@ function steps(now: Period): Step[] {
   // is asked anything, so they sit at the left of the curve at zero.
   const free = now.outputs
     .filter((o) => o.available > 0 && o.unit.marginalCost === 0)
-    .map((o) => ({ label: o.unit.name, fuel: o.unit.fuel as Series, cost: 0, mw: o.available }))
+    .map((o) => ({
+      label: o.unit.name,
+      fuel: o.unit.fuel as Series,
+      cost: 0,
+      mw: o.available,
+    }))
 
   const all = [
     ...free,
@@ -58,9 +67,15 @@ function steps(now: Period): Step[] {
 }
 
 export function MeritCurve({ now }: { now: Period }) {
+  const [box, measured] = useElementWidth(560)
+  const W = Math.max(320, measured)
+  const H = Math.round(Math.min(440, Math.max(250, W * 0.72)))
+  const PLOT = { w: W - PAD.left - PAD.right, h: H - PAD.top - PAD.bottom }
+
   const curve = steps(now)
   const totalMw = curve.length > 0 ? curve[curve.length - 1].to : 1
-  const maxCost = Math.max(INTERCONNECTOR.importCost, ...curve.map((s) => s.cost)) * 1.12
+  const maxCost =
+    Math.max(INTERCONNECTOR.importCost, ...curve.map((s) => s.cost)) * 1.12
 
   const x = (mw: number) => PAD.left + (mw / totalMw) * PLOT.w
   const y = (cost: number) => PAD.top + PLOT.h - (cost / maxCost) * PLOT.h
@@ -69,15 +84,15 @@ export function MeritCurve({ now }: { now: Period }) {
   const flip = x(now.demand) > PAD.left + PLOT.w * 0.72
 
   return (
-    <figure className="border-border/70 bg-card rounded-lg border">
-      <figcaption className="border-border/60 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1 border-b px-4 py-3">
+    <figure className="rounded-lg border border-border/70 bg-card">
+      <figcaption className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1 border-b border-border/60 px-4 py-3">
         <h2 className="text-sm font-semibold tracking-tight">Merit order</h2>
-        <p className="text-muted-foreground text-xs">
+        <p className="text-xs text-muted-foreground">
           Every megawatt available at {periodLabel(now.period)}, cheapest first
         </p>
       </figcaption>
 
-      <div className="px-2 pt-2">
+      <div className="px-2 pt-2" ref={box}>
         <svg
           viewBox={`0 0 ${W} ${H}`}
           className="block w-full"
@@ -172,7 +187,11 @@ export function MeritCurve({ now }: { now: Period }) {
           >
             {Math.round(totalMw).toLocaleString()} MW available
           </text>
-          <text x={PAD.left + 2} y={PAD.top + 10} className="fill-muted-foreground text-[10px]">
+          <text
+            x={PAD.left + 2}
+            y={PAD.top + 10}
+            className="fill-muted-foreground text-[10px]"
+          >
             £/MWh
           </text>
         </svg>

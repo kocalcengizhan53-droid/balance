@@ -19,8 +19,8 @@ export function StatTile({
   tone?: "normal" | "warning"
 }) {
   return (
-    <div className="border-border/70 bg-card rounded-lg border px-4 py-3">
-      <p className="text-muted-foreground text-xs font-medium">{label}</p>
+    <div className="rounded-lg border border-border/70 bg-card px-4 py-3">
+      <p className="text-xs font-medium text-muted-foreground">{label}</p>
       <p className="mt-1.5 flex items-baseline gap-1.5">
         <span
           className={`text-2xl leading-none font-semibold tracking-tight ${
@@ -29,9 +29,13 @@ export function StatTile({
         >
           {value}
         </span>
-        {unit ? <span className="text-muted-foreground text-xs">{unit}</span> : null}
+        {unit ? (
+          <span className="text-xs text-muted-foreground">{unit}</span>
+        ) : null}
       </p>
-      {note ? <p className="text-muted-foreground mt-1.5 text-xs">{note}</p> : null}
+      {note ? (
+        <p className="mt-1.5 text-xs text-muted-foreground">{note}</p>
+      ) : null}
     </div>
   )
 }

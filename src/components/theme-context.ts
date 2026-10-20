@@ -12,4 +12,6 @@ export type ThemeProviderState = {
  * a context or a hook breaks fast refresh, which is the rule the template switched off
  * project-wide instead of obeying.
  */
-export const ThemeProviderContext = createContext<ThemeProviderState | undefined>(undefined)
+export const ThemeProviderContext = createContext<
+  ThemeProviderState | undefined
+>(undefined)

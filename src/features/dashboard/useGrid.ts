@@ -19,7 +19,7 @@ export function useGrid() {
 
   const toggle = useCallback((id: string) => {
     setOffline((current) =>
-      current.includes(id) ? current.filter((x) => x !== id) : [...current, id],
+      current.includes(id) ? current.filter((x) => x !== id) : [...current, id]
     )
   }, [])
 
@@ -30,7 +30,10 @@ export function useGrid() {
     toggle,
     restore,
     period,
-    setPeriod: useCallback((p: number) => setPeriod(Math.max(0, Math.min(PERIODS - 1, p))), []),
+    setPeriod: useCallback(
+      (p: number) => setPeriod(Math.max(0, Math.min(PERIODS - 1, p))),
+      []
+    ),
     periods: solution.periods,
     now: solution.periods[period] as Period,
     units: UNITS,

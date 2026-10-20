@@ -1,5 +1,7 @@
 import { useId, useState } from "react"
 
+import { useElementWidth } from "@/components/use-element-width"
+
 import { FUEL_LABEL, FUEL_ORDER, fuelVar, type Series } from "@/lib/viz/fuel"
 import type { Period } from "@/lib/grid/dispatch"
 import { PERIODS, periodLabel } from "@/lib/grid/profiles"
@@ -16,20 +18,18 @@ import { PERIODS, periodLabel } from "@/lib/grid/profiles"
  * comes from the same numbers as the tiles and cannot disagree with them.
  */
 
-const W = 1000
-const H = 260
 const PAD = { top: 12, right: 8, bottom: 22, left: 44 }
-const PLOT = { w: W - PAD.left - PAD.right, h: H - PAD.top - PAD.bottom }
 
 /** 2px of surface between bands, in user units, so neighbours read apart without a stroke. */
 const GAP = 2
 
 type Stack = { series: Series; points: { x: number; y0: number; y1: number }[] }
 
-function buildStacks(periods: readonly Period[], max: number) {
-  const x = (i: number) => PAD.left + (i / (PERIODS - 1)) * PLOT.w
-  const y = (mw: number) => PAD.top + PLOT.h - (mw / max) * PLOT.h
-
+function buildStacks(
+  periods: readonly Period[],
+  x: (i: number) => number,
+  y: (mw: number) => number
+) {
   const running = new Array(periods.length).fill(0)
   return FUEL_ORDER.map((series) => {
     const points = periods.map((p, i) => {
@@ -48,8 +48,12 @@ function buildStacks(periods: readonly Period[], max: number) {
 }
 
 const area = (points: Stack["points"]) => {
-  const top = points.map((p) => `${p.x.toFixed(1)},${(p.y1 + GAP / 2).toFixed(1)}`)
-  const bottom = [...points].reverse().map((p) => `${p.x.toFixed(1)},${p.y0.toFixed(1)}`)
+  const top = points.map(
+    (p) => `${p.x.toFixed(1)},${(p.y1 + GAP / 2).toFixed(1)}`
+  )
+  const bottom = [...points]
+    .reverse()
+    .map((p) => `${p.x.toFixed(1)},${p.y0.toFixed(1)}`)
   return `M${top.join("L")}L${bottom.join("L")}Z`
 }
 
@@ -63,54 +67,82 @@ export function DispatchChart({
   onSelect: (period: number) => void
 }) {
   const id = useId()
+  const [box, measured] = useElementWidth(1000)
   const [hover, setHover] = useState<number | null>(null)
   const active = hover ?? period
 
+  const W = Math.max(320, measured)
+  // Proportional, so the day keeps its shape on a wide screen and stays tall enough on a phone.
+  const H = Math.round(Math.min(400, Math.max(210, W * 0.26)))
+  const PLOT = { w: W - PAD.left - PAD.right, h: H - PAD.top - PAD.bottom }
+
   const peak = Math.max(
-    ...periods.map((p) => p.outputs.reduce((s, o) => s + o.mw, 0) + Math.max(0, p.interconnector)),
-    ...periods.map((p) => p.demand),
+    ...periods.map(
+      (p) =>
+        p.outputs.reduce((s, o) => s + o.mw, 0) + Math.max(0, p.interconnector)
+    ),
+    ...periods.map((p) => p.demand)
   )
   const max = Math.ceil(peak / 1000) * 1000
   const x = (i: number) => PAD.left + (i / (PERIODS - 1)) * PLOT.w
   const y = (mw: number) => PAD.top + PLOT.h - (mw / max) * PLOT.h
 
-  const stacks = buildStacks(periods, max)
-  const demandLine = periods.map((p, i) => `${x(i).toFixed(1)},${y(p.demand).toFixed(1)}`).join("L")
+  const stacks = buildStacks(periods, x, y)
+  const demandLine = periods
+    .map((p, i) => `${x(i).toFixed(1)},${y(p.demand).toFixed(1)}`)
+    .join("L")
 
   const hasShortfall = periods.some((p) => p.unserved > 0.5)
   const servedTop = (p: Period) =>
     p.outputs.reduce((s, o) => s + o.mw, 0) + Math.max(0, p.interconnector)
-  const shortfallArea = `M${periods.map((p, i) => `${x(i).toFixed(1)},${y(p.demand).toFixed(1)}`).join("L")}L${[...periods]
+  const shortfallArea = `M${periods.map((p, i) => `${x(i).toFixed(1)},${y(p.demand).toFixed(1)}`).join("L")}L${[
+    ...periods,
+  ]
     .map((p, i) => ({ p, i }))
     .reverse()
-    .map(({ p, i }) => `${x(i).toFixed(1)},${y(Math.min(p.demand, servedTop(p))).toFixed(1)}`)
+    .map(
+      ({ p, i }) =>
+        `${x(i).toFixed(1)},${y(Math.min(p.demand, servedTop(p))).toFixed(1)}`
+    )
     .join("L")}Z`
   const ticks = Array.from({ length: max / 2000 + 1 }, (_, i) => i * 2000)
   const now = periods[active]
 
   const fromClientX = (clientX: number, box: DOMRect) => {
     const ratio = (clientX - box.left) / box.width
-    return Math.round(Math.max(0, Math.min(1, (ratio * W - PAD.left) / PLOT.w)) * (PERIODS - 1))
+    return Math.round(
+      Math.max(0, Math.min(1, (ratio * W - PAD.left) / PLOT.w)) * (PERIODS - 1)
+    )
   }
 
   return (
-    <figure className="border-border/70 bg-card rounded-lg border">
-      <figcaption className="border-border/60 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1 border-b px-4 py-3">
-        <h2 className="text-sm font-semibold tracking-tight">Dispatch across the day</h2>
-        <p className="text-muted-foreground text-xs">
+    <figure className="rounded-lg border border-border/70 bg-card">
+      <figcaption className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1 border-b border-border/60 px-4 py-3">
+        <h2 className="text-sm font-semibold tracking-tight">
+          Dispatch across the day
+        </h2>
+        <p className="text-xs text-muted-foreground">
           Megawatts by fuel, half-hourly. The line is demand.
         </p>
       </figcaption>
 
-      <div className="px-2 pt-2">
+      <div className="px-2 pt-2" ref={box}>
         <svg
           viewBox={`0 0 ${W} ${H}`}
           className="block w-full touch-none"
           role="img"
           aria-label={`Dispatch by fuel across the day. At ${periodLabel(active)}, demand is ${now.demand} megawatts.`}
-          onPointerMove={(e) => setHover(fromClientX(e.clientX, e.currentTarget.getBoundingClientRect()))}
+          onPointerMove={(e) =>
+            setHover(
+              fromClientX(e.clientX, e.currentTarget.getBoundingClientRect())
+            )
+          }
           onPointerLeave={() => setHover(null)}
-          onPointerDown={(e) => onSelect(fromClientX(e.clientX, e.currentTarget.getBoundingClientRect()))}
+          onPointerDown={(e) =>
+            onSelect(
+              fromClientX(e.clientX, e.currentTarget.getBoundingClientRect())
+            )
+          }
         >
           {ticks.map((t) => (
             <g key={t}>
@@ -134,12 +166,20 @@ export function DispatchChart({
             </g>
           ))}
           {/* Over the plot, not on the axis: at the axis it printed on top of the top tick. */}
-          <text x={PAD.left + 4} y={PAD.top + 10} className="fill-muted-foreground text-[10px]">
+          <text
+            x={PAD.left + 4}
+            y={PAD.top + 10}
+            className="fill-muted-foreground text-[10px]"
+          >
             GW
           </text>
 
           {stacks.map((stack) => (
-            <path key={stack.series} d={area(stack.points)} fill={fuelVar(stack.series)} />
+            <path
+              key={stack.series}
+              d={area(stack.points)}
+              fill={fuelVar(stack.series)}
+            />
           ))}
 
           {/*
@@ -159,9 +199,20 @@ export function DispatchChart({
                 patternUnits="userSpaceOnUse"
                 patternTransform="rotate(45)"
               >
-                <line x1={0} y1={0} x2={0} y2={6} className="stroke-destructive" strokeWidth={2} />
+                <line
+                  x1={0}
+                  y1={0}
+                  x2={0}
+                  y2={6}
+                  className="stroke-destructive"
+                  strokeWidth={2}
+                />
               </pattern>
-              <path d={shortfallArea} fill={`url(#${id}-short)`} opacity={0.5} />
+              <path
+                d={shortfallArea}
+                fill={`url(#${id}-short)`}
+                opacity={0.5}
+              />
             </>
           ) : null}
 
@@ -207,14 +258,16 @@ export function DispatchChart({
         the light surface and may not carry identity alone.
       */}
       <div
-        className="border-border/60 grid grid-cols-2 gap-x-6 gap-y-1.5 border-t px-4 py-3 sm:grid-cols-3 lg:grid-cols-5"
+        className="grid grid-cols-2 gap-x-6 gap-y-1.5 border-t border-border/60 px-4 py-3 sm:grid-cols-3 lg:grid-cols-5"
         aria-live="polite"
       >
         {FUEL_ORDER.map((series) => {
           const mw =
             series === "import"
               ? Math.max(0, now.interconnector)
-              : now.outputs.filter((o) => o.unit.fuel === series).reduce((s, o) => s + o.mw, 0)
+              : now.outputs
+                  .filter((o) => o.unit.fuel === series)
+                  .reduce((s, o) => s + o.mw, 0)
           return (
             <div key={series} className="flex items-baseline gap-2">
               <span
@@ -222,20 +275,30 @@ export function DispatchChart({
                 className="mt-0.5 size-2.5 shrink-0 rounded-[2px]"
                 style={{ backgroundColor: fuelVar(series) }}
               />
-              <span className="tabular-nums text-sm font-medium">{Math.round(mw)}</span>
-              <span className="text-muted-foreground truncate text-xs">{FUEL_LABEL[series]}</span>
+              <span className="text-sm font-medium tabular-nums">
+                {Math.round(mw)}
+              </span>
+              <span className="truncate text-xs text-muted-foreground">
+                {FUEL_LABEL[series]}
+              </span>
             </div>
           )
         })}
         <div className="flex items-baseline gap-2">
-          <span aria-hidden="true" className="bg-foreground mt-0.5 h-0.5 w-2.5 shrink-0" />
-          <span className="tabular-nums text-sm font-medium">{now.demand}</span>
-          <span className="text-muted-foreground text-xs">Demand</span>
+          <span
+            aria-hidden="true"
+            className="mt-0.5 h-0.5 w-2.5 shrink-0 bg-foreground"
+          />
+          <span className="text-sm font-medium tabular-nums">{now.demand}</span>
+          <span className="text-xs text-muted-foreground">Demand</span>
         </div>
       </div>
 
-      <label className="border-border/60 flex items-center gap-3 border-t px-4 py-3" htmlFor={id}>
-        <span className="text-muted-foreground shrink-0 text-xs">Time</span>
+      <label
+        className="flex items-center gap-3 border-t border-border/60 px-4 py-3"
+        htmlFor={id}
+      >
+        <span className="shrink-0 text-xs text-muted-foreground">Time</span>
         <input
           id={id}
           type="range"
@@ -245,9 +308,11 @@ export function DispatchChart({
           value={period}
           onChange={(e) => onSelect(Number(e.target.value))}
           aria-valuetext={periodLabel(period)}
-          className="accent-foreground h-1 w-full cursor-pointer"
+          className="h-1 w-full cursor-pointer accent-foreground"
         />
-        <span className="shrink-0 text-sm font-medium tabular-nums">{periodLabel(period)}</span>
+        <span className="shrink-0 text-sm font-medium tabular-nums">
+          {periodLabel(period)}
+        </span>
       </label>
     </figure>
   )

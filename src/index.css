@@ -177,3 +177,23 @@
   --color-fuel-battery: var(--fuel-battery);
   --color-fuel-import: var(--fuel-import);
 }
+
+/*
+ * Power moving along a line. The dash travels; the line does not. Duration is set per line
+ * from its own loading, so an idle circuit is visibly still rather than animated slowly.
+ */
+@keyframes flow {
+  to {
+    stroke-dashoffset: -4;
+  }
+}
+
+.flow {
+  animation: flow 2s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .flow {
+    animation: none;
+  }
+}

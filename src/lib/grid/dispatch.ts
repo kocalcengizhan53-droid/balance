@@ -76,7 +76,7 @@ const MERIT: readonly { id: string; cost: number; unit?: Unit }[] = [
 function solvePeriod(
   period: number,
   previous: Map<string, number>,
-  offline: ReadonlySet<string>,
+  offline: ReadonlySet<string>
 ): Period {
   const demand = DEMAND[period]
   const mw = new Map<string, number>()
@@ -91,13 +91,19 @@ function solvePeriod(
   }
 
   const headroomOf = (unit: Unit) =>
-    Math.min(availableOf.get(unit.id) ?? 0, (previous.get(unit.id) ?? 0) + RAMP_PER_PERIOD(unit))
+    Math.min(
+      availableOf.get(unit.id) ?? 0,
+      (previous.get(unit.id) ?? 0) + RAMP_PER_PERIOD(unit)
+    )
 
   /** The least a unit can be generating this period, given where it was last period. */
   const floorOf = (unit: Unit) => {
     const available = availableOf.get(unit.id) ?? 0
     if (available === 0) return 0
-    const mustStay = Math.max(0, (previous.get(unit.id) ?? 0) - RAMP_PER_PERIOD(unit))
+    const mustStay = Math.max(
+      0,
+      (previous.get(unit.id) ?? 0) - RAMP_PER_PERIOD(unit)
+    )
     if (mustStay <= 0) return 0
     // Still synchronised and unable to come off: it has to be at least stable.
     return Math.min(available, Math.max(mustStay, unit.minStable))
@@ -200,11 +206,16 @@ function solvePeriod(
       surplus -= cut
     }
 
-    for (const unit of [...UNITS].sort((a, b) => b.marginalCost - a.marginalCost)) {
+    for (const unit of [...UNITS].sort(
+      (a, b) => b.marginalCost - a.marginalCost
+    )) {
       if (surplus <= 0.0001) break
       if (unit.marginalCost === 0) continue
       const current = mw.get(unit.id) ?? 0
-      const hardFloor = Math.max(0, (previous.get(unit.id) ?? 0) - RAMP_PER_PERIOD(unit))
+      const hardFloor = Math.max(
+        0,
+        (previous.get(unit.id) ?? 0) - RAMP_PER_PERIOD(unit)
+      )
       const cut = Math.min(current - hardFloor, surplus)
       if (cut <= 0) continue
       mw.set(unit.id, current - cut)
@@ -222,7 +233,8 @@ function solvePeriod(
   }))
 
   // Weighted by energy, and the import carries the neighbour's carbon rather than none.
-  const servedMw = outputs.reduce((sum, o) => sum + o.mw, 0) + Math.max(0, interconnector)
+  const servedMw =
+    outputs.reduce((sum, o) => sum + o.mw, 0) + Math.max(0, interconnector)
   const grams =
     outputs.reduce((sum, o) => sum + o.mw * o.unit.carbon, 0) +
     Math.max(0, interconnector) * INTERCONNECTOR.carbon

@@ -26,9 +26,10 @@ describe("dispatch", () => {
       const lhs = generated + imported + p.unserved
       const rhs = p.demand + exported
 
-      expect(Math.abs(lhs - rhs), `${periodLabel(p.period)}: ${lhs} in, ${rhs} out`).toBeLessThan(
-        TOLERANCE,
-      )
+      expect(
+        Math.abs(lhs - rhs),
+        `${periodLabel(p.period)}: ${lhs} in, ${rhs} out`
+      ).toBeLessThan(TOLERANCE)
     }
   })
 
@@ -40,14 +41,17 @@ describe("dispatch", () => {
   it("never asks a unit for more than it has", () => {
     for (const p of base.periods) {
       for (const o of p.outputs) {
-        expect(o.mw, `${o.unit.name} at ${periodLabel(p.period)}`).toBeLessThanOrEqual(
-          o.available + TOLERANCE,
-        )
+        expect(
+          o.mw,
+          `${o.unit.name} at ${periodLabel(p.period)}`
+        ).toBeLessThanOrEqual(o.available + TOLERANCE)
         expect(o.mw).toBeGreaterThanOrEqual(0)
       }
     }
     for (const p of base.periods) {
-      expect(Math.abs(p.interconnector)).toBeLessThanOrEqual(INTERCONNECTOR.capacity + TOLERANCE)
+      expect(Math.abs(p.interconnector)).toBeLessThanOrEqual(
+        INTERCONNECTOR.capacity + TOLERANCE
+      )
     }
   })
 
@@ -62,7 +66,7 @@ describe("dispatch", () => {
         const limit = o.unit.rampRate * 30 + TOLERANCE
         expect(
           Math.abs(o.mw - was),
-          `${o.unit.name} moved ${Math.abs(o.mw - was).toFixed(0)} MW into ${periodLabel(p)}`,
+          `${o.unit.name} moved ${Math.abs(o.mw - was).toFixed(0)} MW into ${periodLabel(p)}`
         ).toBeLessThanOrEqual(limit)
       }
     }
@@ -74,14 +78,16 @@ describe("dispatch", () => {
         if (o.unit.minStable === 0 || o.mw === 0) continue
         expect(
           o.mw,
-          `${o.unit.name} at ${periodLabel(p.period)} is under its minimum stable output`,
+          `${o.unit.name} at ${periodLabel(p.period)} is under its minimum stable output`
         ).toBeGreaterThanOrEqual(o.unit.minStable - TOLERANCE)
       }
     }
   })
 
   it("still balances with the two largest units offline", () => {
-    const biggest = [...UNITS].sort((a, b) => b.capacity - a.capacity).slice(0, 2)
+    const biggest = [...UNITS]
+      .sort((a, b) => b.capacity - a.capacity)
+      .slice(0, 2)
     const broken = solve(biggest.map((u) => u.id))
 
     for (const p of broken.periods) {
@@ -91,7 +97,9 @@ describe("dispatch", () => {
       expect(Math.abs(lhs - rhs)).toBeLessThan(TOLERANCE)
     }
     for (const u of biggest) {
-      const ran = broken.periods.some((p) => p.outputs.find((o) => o.unit.id === u.id)!.mw > 0)
+      const ran = broken.periods.some(
+        (p) => p.outputs.find((o) => o.unit.id === u.id)!.mw > 0
+      )
       expect(ran, `${u.name} generated while offline`).toBe(false)
     }
   })
@@ -111,10 +119,12 @@ describe("dispatch", () => {
 
       const named = UNITS.find((u) => u.name === p.marginalUnit)
       if (named) {
-        expect(p.price, `${periodLabel(p.period)} says ${p.marginalUnit}`).toBe(named.marginalCost)
+        expect(p.price, `${periodLabel(p.period)} says ${p.marginalUnit}`).toBe(
+          named.marginalCost
+        )
         expect(
           p.outputs.find((o) => o.unit.id === named.id)!.mw,
-          `${named.name} set the price at ${periodLabel(p.period)} without generating`,
+          `${named.name} set the price at ${periodLabel(p.period)} without generating`
         ).toBeGreaterThan(0)
       } else if (p.marginalUnit === INTERCONNECTOR.name) {
         expect(p.price).toBe(INTERCONNECTOR.importCost)
@@ -129,11 +139,15 @@ describe("dispatch", () => {
   it("agrees with its own totals", () => {
     const demandEnergy = energy(base.periods, (p) => p.demand)
     const servedEnergy = energy(base.periods, served)
-    const exportEnergy = energy(base.periods, (p) => Math.max(0, -p.interconnector))
-    expect(Math.abs(servedEnergy - demandEnergy - exportEnergy)).toBeLessThan(TOLERANCE)
+    const exportEnergy = energy(base.periods, (p) =>
+      Math.max(0, -p.interconnector)
+    )
+    expect(Math.abs(servedEnergy - demandEnergy - exportEnergy)).toBeLessThan(
+      TOLERANCE
+    )
     expect(demandEnergy).toBeCloseTo(
       DEMAND.reduce((s, d) => s + d * 0.5, 0),
-      6,
+      6
     )
   })
 })

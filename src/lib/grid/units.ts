@@ -39,8 +39,6 @@ export type Unit = {
   readonly carbon: number
   /** How fast output can change, MW per minute. */
   readonly rampRate: number
-  /** Position on the schematic, 0–1 across the region. */
-  readonly at: readonly [number, number]
   /** The node it connects to. Flows are drawn along these. */
   readonly node: string
 }
@@ -55,7 +53,6 @@ export const UNITS: readonly Unit[] = [
     marginalCost: 9,
     carbon: 0,
     rampRate: 0,
-    at: [0.18, 0.72],
     node: "west",
   },
   {
@@ -67,7 +64,6 @@ export const UNITS: readonly Unit[] = [
     marginalCost: 62,
     carbon: 352,
     rampRate: 22,
-    at: [0.46, 0.55],
     node: "central",
   },
   {
@@ -79,7 +75,6 @@ export const UNITS: readonly Unit[] = [
     marginalCost: 64,
     carbon: 358,
     rampRate: 22,
-    at: [0.5, 0.58],
     node: "central",
   },
   {
@@ -91,7 +86,6 @@ export const UNITS: readonly Unit[] = [
     marginalCost: 71,
     carbon: 394,
     rampRate: 18,
-    at: [0.78, 0.44],
     node: "east",
   },
   {
@@ -103,7 +97,6 @@ export const UNITS: readonly Unit[] = [
     marginalCost: 88,
     carbon: 452,
     rampRate: 26,
-    at: [0.63, 0.3],
     node: "central",
   },
   {
@@ -115,7 +108,6 @@ export const UNITS: readonly Unit[] = [
     marginalCost: 0,
     carbon: 0,
     rampRate: 400,
-    at: [0.3, 0.14],
     node: "north",
   },
   {
@@ -127,7 +119,6 @@ export const UNITS: readonly Unit[] = [
     marginalCost: 0,
     carbon: 0,
     rampRate: 400,
-    at: [0.12, 0.34],
     node: "north",
   },
   {
@@ -139,7 +130,6 @@ export const UNITS: readonly Unit[] = [
     marginalCost: 0,
     carbon: 0,
     rampRate: 400,
-    at: [0.72, 0.78],
     node: "east",
   },
   {
@@ -151,7 +141,6 @@ export const UNITS: readonly Unit[] = [
     marginalCost: 36,
     carbon: 0,
     rampRate: 150,
-    at: [0.24, 0.06],
     node: "north",
   },
   {
@@ -163,7 +152,6 @@ export const UNITS: readonly Unit[] = [
     marginalCost: 79,
     carbon: 121,
     rampRate: 12,
-    at: [0.58, 0.82],
     node: "central",
   },
   {
@@ -175,7 +163,6 @@ export const UNITS: readonly Unit[] = [
     marginalCost: 104,
     carbon: 0,
     rampRate: 220,
-    at: [0.42, 0.38],
     node: "central",
   },
 ]
@@ -194,15 +181,15 @@ export const INTERCONNECTOR = {
   /** Paid to export, £/MWh. Lower than the import price: the spread is the link's business. */
   exportPrice: 41,
   carbon: 218,
-  at: [0.92, 0.62],
   node: "east",
 } as const
 
+/** The four grid nodes. Units connect to one; every node feeds the single busbar. */
 export const NODES = {
-  north: { name: "North", at: [0.22, 0.16] },
-  west: { name: "West", at: [0.2, 0.66] },
-  central: { name: "Central", at: [0.52, 0.5] },
-  east: { name: "East", at: [0.8, 0.52] },
+  north: { name: "North" },
+  west: { name: "West" },
+  central: { name: "Central" },
+  east: { name: "East" },
 } as const
 
 export type NodeId = keyof typeof NODES
