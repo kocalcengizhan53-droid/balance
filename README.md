@@ -12,7 +12,7 @@ A grid control room for a region that does not exist, solved half-hourly, built 
 
 Nothing is typed into a component. Every figure — the rail's status card, the masthead clock and frequency, the KPI trend badges, the stacked day, the supply curve, the settlement table, the events feed, and the width, count and speed of every particle in the scene — is derived from [`src/lib/grid/`](src/lib/grid), and the arithmetic has one invariant:
 
-```
+```text
 generation + imports + unserved === demand + exports
 ```
 
