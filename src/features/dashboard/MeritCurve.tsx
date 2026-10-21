@@ -1,3 +1,5 @@
+import { motion } from "motion/react"
+
 import { useElementWidth } from "@/components/use-element-width"
 import { fuelVar, type Series } from "@/lib/viz/fuel"
 import type { Period } from "@/lib/grid/dispatch"
@@ -17,6 +19,9 @@ import { periodLabel } from "@/lib/grid/profiles"
  */
 
 const PAD = { top: 14, right: 12, bottom: 26, left: 40 }
+
+/* Steps slide into their new order rather than cutting, so a re-sort reads as a re-sort. */
+const EASE = { duration: 0.6, ease: [0.16, 1, 0.3, 1] } as const
 
 type Step = {
   label: string
@@ -84,7 +89,7 @@ export function MeritCurve({ now }: { now: Period }) {
   const flip = x(now.demand) > PAD.left + PLOT.w * 0.72
 
   return (
-    <figure className="rounded-lg border border-border/70 bg-card">
+    <figure className="panel">
       <figcaption className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1 border-b border-border/60 px-4 py-3">
         <h2 className="text-sm font-semibold tracking-tight">Merit order</h2>
         <p className="text-xs text-muted-foreground">
@@ -126,51 +131,60 @@ export function MeritCurve({ now }: { now: Period }) {
             if (width <= 0) return null
             const top = y(s.cost)
             return (
-              <rect
+              <motion.rect
                 key={`${s.label}-${s.from}`}
-                x={x(s.from) + 1}
-                width={width}
+                initial={false}
                 /*
                  * Free fuel has no height, because it costs nothing — correct economics and
                  * useless as a drawing. A floor of 5px keeps the WIDTH readable, which is the
                  * informative part: how much of the system is already paid for.
                  */
-                height={Math.max(5, PAD.top + PLOT.h - top)}
-                y={Math.min(top, PAD.top + PLOT.h - 5)}
+                animate={{
+                  x: x(s.from) + 1,
+                  width,
+                  height: Math.max(5, PAD.top + PLOT.h - top),
+                  y: Math.min(top, PAD.top + PLOT.h - 5),
+                  opacity: s.from < now.demand ? 1 : 0.28,
+                }}
+                transition={EASE}
                 fill={fuelVar(s.fuel)}
-                opacity={s.from < now.demand ? 1 : 0.28}
               >
                 <title>{`${s.label} — £${s.cost}/MWh, ${Math.round(s.to - s.from)} MW`}</title>
-              </rect>
+              </motion.rect>
             )
           })}
 
           {/* Where demand cuts the staircase: the step it lands on is the price. */}
-          <line
-            x1={x(now.demand)}
+          <motion.line
+            initial={false}
+            animate={{ x1: x(now.demand), x2: x(now.demand) }}
+            transition={EASE}
             y1={PAD.top}
-            x2={x(now.demand)}
             y2={PAD.top + PLOT.h}
             className="stroke-foreground"
             strokeWidth={2}
           />
           {/* Flips to the inside when demand lands near the right edge, where it was clipped. */}
-          <text
-            x={x(now.demand) + (flip ? -6 : 6)}
+          <motion.text
+            initial={false}
+            animate={{ x: x(now.demand) + (flip ? -6 : 6) }}
+            transition={EASE}
             y={PAD.top + 10}
             textAnchor={flip ? "end" : "start"}
             className="fill-foreground text-[11px] font-medium"
           >
             {`£${Math.round(now.price)}`}
-          </text>
-          <text
-            x={x(now.demand) + (flip ? -6 : 6)}
+          </motion.text>
+          <motion.text
+            initial={false}
+            animate={{ x: x(now.demand) + (flip ? -6 : 6) }}
+            transition={EASE}
             y={PAD.top + 23}
             textAnchor={flip ? "end" : "start"}
             className="fill-muted-foreground text-[10px]"
           >
             {now.marginalUnit}
-          </text>
+          </motion.text>
 
           <text
             x={PAD.left}

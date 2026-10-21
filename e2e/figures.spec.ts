@@ -2,6 +2,10 @@ import type { Page } from "@playwright/test"
 
 import { expect, test } from "./fixtures"
 
+/** The single-line diagram: the one place a unit's control stands still. */
+const diagram = (page: import("@playwright/test").Page) =>
+  page.locator("figure", { has: page.getByText("Where it is coming from") })
+
 /**
  * The one rule, checked where it can actually be broken.
  *
@@ -13,7 +17,7 @@ import { expect, test } from "./fixtures"
  */
 
 const figure = (page: Page, name: string) =>
-  page.locator(`[data-figure="${name}"]`)
+  page.locator(`[data-figure^="${name}"]`)
 
 async function solved(page: Page) {
   return page.evaluate(() => {
@@ -53,7 +57,7 @@ async function expectAgreement(page: Page) {
   await expect(figure(page, "Price")).toContainText(`£${Math.round(s.price)}`)
   await expect(figure(page, "Price")).toContainText(s.marginalUnit)
   await expect(figure(page, "Interconnector")).toContainText(
-    String(Math.abs(Math.round(s.link)))
+    Math.abs(Math.round(s.link)).toLocaleString("en-GB")
   )
   await expect(figure(page, "Interconnector")).toContainText(
     s.link >= 0 ? "importing" : "exporting"
@@ -101,7 +105,7 @@ test("they still agree after the period changes", async ({ page }) => {
 test("they still agree with two units offline", async ({ page }) => {
   await page.goto("/")
   for (const name of ["Calder A", "Calder B"]) {
-    await page
+    await diagram(page)
       .getByRole("button", { name: new RegExp(`^${name}, \\d`) })
       .click()
   }

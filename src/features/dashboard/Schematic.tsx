@@ -122,7 +122,7 @@ export function Schematic({
   const linkY = rowY(LINK_ROW)
 
   return (
-    <figure className="rounded-lg border border-border/70 bg-card">
+    <figure className="panel">
       <figcaption className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1 border-b border-border/60 px-4 py-3">
         <h2 className="text-sm font-semibold tracking-tight">
           Where it is coming from

@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest"
 
-import { energy, served, solve } from "@/lib/grid/dispatch"
+import {
+  BASELINE,
+  costWithCarbon,
+  energy,
+  served,
+  solve,
+} from "@/lib/grid/dispatch"
 import { DEMAND, PERIODS, periodLabel } from "@/lib/grid/profiles"
 import { INTERCONNECTOR, UNITS } from "@/lib/grid/units"
 
@@ -149,5 +155,49 @@ describe("dispatch", () => {
       DEMAND.reduce((s, d) => s + d * 0.5, 0),
       6
     )
+  })
+})
+
+describe("the levers", () => {
+  it("still balances under every lever, pulled hard", () => {
+    for (const scenario of [
+      { ...BASELINE, carbonPrice: 150 },
+      { ...BASELINE, demandScale: 1.25 },
+      { ...BASELINE, windScale: 0.2 },
+      { carbonPrice: 120, demandScale: 1.2, windScale: 0.3 },
+    ]) {
+      for (const p of solve([], scenario).periods) {
+        const generated = p.outputs.reduce((s, o) => s + o.mw, 0)
+        const lhs = generated + Math.max(0, p.interconnector) + p.unserved
+        const rhs = p.demand + Math.max(0, -p.interconnector)
+        expect(Math.abs(lhs - rhs), JSON.stringify(scenario)).toBeLessThan(
+          TOLERANCE
+        )
+      }
+    }
+  })
+
+  it("a carbon price moves gas behind the cleaner plant it used to beat", () => {
+    // At £0 gas at Calder A (£62) runs before biomass at Thornby (£79). Price carbon and the
+    // 352 g gas unit gains £17.60 per £50 — by £60/t it is dearer than the 121 g biomass.
+    const gas = (price: number) => costWithCarbon(62, 352, price)
+    const biomass = (price: number) => costWithCarbon(79, 121, price)
+    expect(gas(0)).toBeLessThan(biomass(0))
+    expect(gas(80)).toBeGreaterThan(biomass(80))
+
+    // And the system price rises with it: the marginal unit is dearer in every period.
+    const base = solve().periods
+    const priced = solve([], { ...BASELINE, carbonPrice: 80 }).periods
+    const meanPrice = (ps: typeof base) =>
+      ps.reduce((s, p) => s + p.price, 0) / ps.length
+    expect(meanPrice(priced)).toBeGreaterThan(meanPrice(base))
+  })
+
+  it("a calm day leaves the system importing where it was exporting", () => {
+    const windy = solve().periods
+    const calm = solve([], { ...BASELINE, windScale: 0.2 }).periods
+    const imported = (ps: typeof windy) =>
+      ps.reduce((s, p) => s + Math.max(0, p.interconnector), 0)
+    expect(imported(calm)).toBeGreaterThan(imported(windy))
   })
 })

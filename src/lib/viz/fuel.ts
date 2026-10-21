@@ -5,7 +5,7 @@ import type { Fuel } from "@/lib/grid/units"
  *
  * It is also the order the colour palette was validated against: in a stacked chart the pairs
  * that have to be distinguishable are the neighbours, so changing this order invalidates the
- * palette and `fuel.test.ts` will say so.
+ * palette: re-run the dataviz validator against both themes' surfaces before shipping it.
  */
 export const FUEL_ORDER = [
   "nuclear",

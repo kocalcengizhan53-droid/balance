@@ -2,147 +2,252 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 @import "@fontsource-variable/geist";
+@import "@fontsource-variable/geist-mono";
 
 @custom-variant dark (&:is(.dark *));
 
+/*
+ * A control room, not an admin panel.
+ *
+ * Dark by default because the room it is modelled on is dark: a wall of instruments read
+ * from across a desk, where the surface recedes and the figures and the live marks carry the
+ * light. Every surface is biased a few steps toward blue so the fuel colours sit on something
+ * with a temperature rather than on grey, and the one accent is an amber that means "live" —
+ * the clock, the playhead, the ring on whatever has focus — and is used for nothing else.
+ *
+ * The light theme is a designed alternative, not an inversion: cool paper, ink, the same amber
+ * taken down to where it holds contrast on white.
+ */
+
 @theme inline {
-    --font-heading: var(--font-sans);
-    --font-sans: 'Geist Variable', sans-serif;
-    --color-sidebar-ring: var(--sidebar-ring);
-    --color-sidebar-border: var(--sidebar-border);
-    --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-    --color-sidebar-accent: var(--sidebar-accent);
-    --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-    --color-sidebar-primary: var(--sidebar-primary);
-    --color-sidebar-foreground: var(--sidebar-foreground);
-    --color-sidebar: var(--sidebar);
-    --color-chart-5: var(--chart-5);
-    --color-chart-4: var(--chart-4);
-    --color-chart-3: var(--chart-3);
-    --color-chart-2: var(--chart-2);
-    --color-chart-1: var(--chart-1);
-    --color-ring: var(--ring);
-    --color-input: var(--input);
-    --color-border: var(--border);
-    --color-destructive: var(--destructive);
-    --color-accent-foreground: var(--accent-foreground);
-    --color-accent: var(--accent);
-    --color-muted-foreground: var(--muted-foreground);
-    --color-muted: var(--muted);
-    --color-secondary-foreground: var(--secondary-foreground);
-    --color-secondary: var(--secondary);
-    --color-primary-foreground: var(--primary-foreground);
-    --color-primary: var(--primary);
-    --color-popover-foreground: var(--popover-foreground);
-    --color-popover: var(--popover);
-    --color-card-foreground: var(--card-foreground);
-    --color-card: var(--card);
-    --color-foreground: var(--foreground);
-    --color-background: var(--background);
-    --radius-sm: calc(var(--radius) * 0.6);
-    --radius-md: calc(var(--radius) * 0.8);
-    --radius-lg: var(--radius);
-    --radius-xl: calc(var(--radius) * 1.4);
-    --radius-2xl: calc(var(--radius) * 1.8);
-    --radius-3xl: calc(var(--radius) * 2.2);
-    --radius-4xl: calc(var(--radius) * 2.6);
+  --font-sans: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Geist Mono Variable", ui-monospace, "SF Mono", monospace;
+  --font-heading: var(--font-sans);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-live: var(--live);
+
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out-quart: cubic-bezier(0.76, 0, 0.24, 1);
 }
 
 :root {
-    --background: oklch(1 0 0);
-    --foreground: oklch(0.145 0 0);
-    --card: oklch(1 0 0);
-    --card-foreground: oklch(0.145 0 0);
-    --popover: oklch(1 0 0);
-    --popover-foreground: oklch(0.145 0 0);
-    --primary: oklch(0.205 0 0);
-    --primary-foreground: oklch(0.985 0 0);
-    --secondary: oklch(0.97 0 0);
-    --secondary-foreground: oklch(0.205 0 0);
-    --muted: oklch(0.97 0 0);
-    --muted-foreground: oklch(0.556 0 0);
-    --accent: oklch(0.97 0 0);
-    --accent-foreground: oklch(0.205 0 0);
-    --destructive: oklch(0.577 0.245 27.325);
-    --border: oklch(0.922 0 0);
-    --input: oklch(0.922 0 0);
-    --ring: oklch(0.708 0 0);
-    --chart-1: oklch(0.87 0 0);
-    --chart-2: oklch(0.556 0 0);
-    --chart-3: oklch(0.439 0 0);
-    --chart-4: oklch(0.371 0 0);
-    --chart-5: oklch(0.269 0 0);
-    --radius: 0.625rem;
-    --sidebar: oklch(0.985 0 0);
-    --sidebar-foreground: oklch(0.145 0 0);
-    --sidebar-primary: oklch(0.205 0 0);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.97 0 0);
-    --sidebar-accent-foreground: oklch(0.205 0 0);
-    --sidebar-border: oklch(0.922 0 0);
-    --sidebar-ring: oklch(0.708 0 0);
+  --radius: 0.75rem;
+
+  --background: oklch(0.965 0.005 255);
+  --foreground: oklch(0.19 0.015 255);
+  --card: oklch(0.995 0.001 255);
+  --card-foreground: var(--foreground);
+  --popover: var(--card);
+  --popover-foreground: var(--foreground);
+  --primary: var(--foreground);
+  --primary-foreground: var(--card);
+  --secondary: oklch(0.935 0.006 255);
+  --secondary-foreground: var(--foreground);
+  --muted: oklch(0.935 0.006 255);
+  --muted-foreground: oklch(0.47 0.014 255);
+  --accent: oklch(0.66 0.16 62);
+  --accent-foreground: oklch(0.99 0 0);
+  --live: var(--accent);
+  --destructive: oklch(0.56 0.22 26);
+  --border: oklch(0.87 0.008 255);
+  --input: oklch(0.85 0.008 255);
+  --ring: var(--accent);
+
+  /* The panel's edge: a hairline that is lighter above and fades below, read as depth. */
+  --panel-edge-top: oklch(1 0 0 / 90%);
+  --panel-edge-bottom: oklch(0 0 0 / 7%);
+  --glow: oklch(0.66 0.16 62 / 18%);
 }
 
 .dark {
-    --background: oklch(0.145 0 0);
-    --foreground: oklch(0.985 0 0);
-    --card: oklch(0.205 0 0);
-    --card-foreground: oklch(0.985 0 0);
-    --popover: oklch(0.205 0 0);
-    --popover-foreground: oklch(0.985 0 0);
-    --primary: oklch(0.922 0 0);
-    --primary-foreground: oklch(0.205 0 0);
-    --secondary: oklch(0.269 0 0);
-    --secondary-foreground: oklch(0.985 0 0);
-    --muted: oklch(0.269 0 0);
-    --muted-foreground: oklch(0.708 0 0);
-    --accent: oklch(0.269 0 0);
-    --accent-foreground: oklch(0.985 0 0);
-    --destructive: oklch(0.704 0.191 22.216);
-    --border: oklch(1 0 0 / 10%);
-    --input: oklch(1 0 0 / 15%);
-    --ring: oklch(0.556 0 0);
-    --chart-1: oklch(0.87 0 0);
-    --chart-2: oklch(0.556 0 0);
-    --chart-3: oklch(0.439 0 0);
-    --chart-4: oklch(0.371 0 0);
-    --chart-5: oklch(0.269 0 0);
-    --sidebar: oklch(0.205 0 0);
-    --sidebar-foreground: oklch(0.985 0 0);
-    --sidebar-primary: oklch(0.488 0.243 264.376);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.269 0 0);
-    --sidebar-accent-foreground: oklch(0.985 0 0);
-    --sidebar-border: oklch(1 0 0 / 10%);
-    --sidebar-ring: oklch(0.556 0 0);
+  --background: oklch(0.145 0.012 255);
+  --foreground: oklch(0.955 0.006 255);
+  --card: oklch(0.185 0.012 255);
+  --card-foreground: var(--foreground);
+  --popover: oklch(0.21 0.012 255);
+  --popover-foreground: var(--foreground);
+  --primary: var(--foreground);
+  --primary-foreground: var(--background);
+  --secondary: oklch(0.24 0.012 255);
+  --secondary-foreground: var(--foreground);
+  --muted: oklch(0.24 0.012 255);
+  --muted-foreground: oklch(0.68 0.012 255);
+  --accent: oklch(0.82 0.15 78);
+  --accent-foreground: oklch(0.2 0.03 78);
+  --live: var(--accent);
+  --destructive: oklch(0.7 0.19 24);
+  --border: oklch(1 0 0 / 9%);
+  --input: oklch(1 0 0 / 12%);
+  --ring: var(--accent);
+
+  --panel-edge-top: oklch(1 0 0 / 14%);
+  --panel-edge-bottom: oklch(1 0 0 / 3%);
+  --glow: oklch(0.82 0.15 78 / 28%);
 }
 
 @layer base {
   * {
     @apply border-border outline-ring/50;
-    }
-  body {
-    @apply bg-background text-foreground;
-    }
+  }
   html {
     @apply font-sans;
-    }
+    color-scheme: light;
+  }
+  html.dark {
+    color-scheme: dark;
+  }
+  body {
+    @apply bg-background text-foreground;
+    /*
+     * The room. A faint engineering grid, so the page has a floor the panels sit on instead
+     * of floating in a void, and one warm wash from the top where the light in a control
+     * room comes from. Both are quiet enough that a screenshot reads them as texture.
+     */
+    background-image:
+      radial-gradient(120rem 40rem at 50% -10rem, var(--glow), transparent 60%),
+      linear-gradient(
+        to right,
+        color-mix(in oklch, var(--foreground) 3.5%, transparent) 1px,
+        transparent 1px
+      ),
+      linear-gradient(
+        to bottom,
+        color-mix(in oklch, var(--foreground) 3.5%, transparent) 1px,
+        transparent 1px
+      );
+    background-size:
+      100% 100%,
+      2rem 2rem,
+      2rem 2rem;
+    background-attachment: fixed, scroll, scroll;
+  }
+}
+
+/* ---------- Instruments ---------------------------------------------------------------- */
+
+/* A figure on an instrument: mono, tabular, tight. Never for prose. */
+@utility figure {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+/* A small-caps label on an instrument: what the figure is. */
+@utility label {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
 }
 
 /*
- * Fuel colours.
- *
+ * A panel: the card, with an edge that is lit from above. One element, one gradient border,
+ * no pseudo-elements, so it composes with anything.
+ */
+@utility panel {
+  position: relative;
+  border-radius: var(--radius);
+  border: 1px solid transparent;
+  background:
+    linear-gradient(var(--card), var(--card)) padding-box,
+    linear-gradient(180deg, var(--panel-edge-top), var(--panel-edge-bottom))
+      border-box;
+  box-shadow:
+    0 1px 0 0 color-mix(in oklch, var(--foreground) 4%, transparent),
+    0 12px 32px -16px oklch(0 0 0 / 45%);
+}
+
+/* A panel over the scene: the room shows through it. */
+@utility glass {
+  position: relative;
+  border-radius: var(--radius);
+  border: 1px solid transparent;
+  background:
+    linear-gradient(
+        color-mix(in oklch, var(--card) 72%, transparent),
+        color-mix(in oklch, var(--card) 72%, transparent)
+      )
+      padding-box,
+    linear-gradient(180deg, var(--panel-edge-top), var(--panel-edge-bottom))
+      border-box;
+  backdrop-filter: blur(18px) saturate(1.3);
+  -webkit-backdrop-filter: blur(18px) saturate(1.3);
+  box-shadow: 0 16px 40px -20px oklch(0 0 0 / 55%);
+}
+
+/* The live lamp. */
+@utility led {
+  display: inline-block;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 9999px;
+  background: var(--live);
+  box-shadow:
+    0 0 0 3px color-mix(in oklch, var(--live) 22%, transparent),
+    0 0 12px 2px color-mix(in oklch, var(--live) 55%, transparent);
+  animation: led 1.6s ease-in-out infinite;
+}
+
+@keyframes led {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 3px color-mix(in oklch, var(--live) 22%, transparent),
+      0 0 12px 2px color-mix(in oklch, var(--live) 55%, transparent);
+  }
+  50% {
+    box-shadow:
+      0 0 0 5px color-mix(in oklch, var(--live) 10%, transparent),
+      0 0 18px 4px color-mix(in oklch, var(--live) 30%, transparent);
+  }
+}
+
+/* Text that glows the way a lit figure does on a dark panel; faint on the light theme. */
+@utility lit {
+  text-shadow: 0 0 24px var(--glow);
+}
+
+/* ---------- Fuel colours ------------------------------------------------------------- */
+
+/*
  * Assigned by constraint, not by taste. Eight stacked series is the documented maximum for a
  * categorical palette, and in a stack what has to be told apart is each pair of neighbours —
- * so the hue order is a path through the graph of pairs that clear the colour-vision and
- * normal-vision floors in BOTH themes, chosen from the 1,684 valid paths as the one closest
- * to what each fuel is conventionally drawn in.
+ * so the hue order (`FUEL_ORDER` in src/lib/viz/fuel.ts) is a path through the graph of pairs
+ * that clear the colour-vision and normal-vision floors in BOTH themes, chosen from the valid
+ * paths as the one closest to what each fuel is conventionally drawn in.
  *
  * The conventions that survived: solar yellow, gas orange, import red. The ones traded away:
  * wind and hydro, because every ordering that gave wind its usual blue put a pair somewhere
- * else in the stack that a reader with deuteranopia could not separate. Validated with the
- * dataviz palette checker; the light surface leaves three hues under 3:1, which is why every
- * series carries a label and a value rather than relying on its colour.
+ * else in the stack that a reader with deuteranopia could not separate.
+ *
+ * Validated with the dataviz skill's validate_palette.js against each theme's card surface
+ * (light #fdfdfc, dark #1b1e26). Three light hues and one dark hue sit under 3:1, which is why
+ * every series carries a label and a value rather than relying on its colour.
  */
 :root {
   --fuel-nuclear: #e87ba4;
@@ -187,6 +292,8 @@
   --color-fuel-import: var(--fuel-import);
 }
 
+/* ---------- Motion ------------------------------------------------------------------- */
+
 /*
  * Power moving along a line. The dash travels; the line does not. Duration is set per line
  * from its own loading, so an idle circuit is visibly still rather than animated slowly.
@@ -202,7 +309,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .flow {
+  .flow,
+  .led {
     animation: none;
   }
 }

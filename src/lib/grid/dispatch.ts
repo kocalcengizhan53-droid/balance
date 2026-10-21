@@ -55,7 +55,39 @@ export type Period = {
 export type Solution = {
   readonly periods: readonly Period[]
   readonly offline: readonly string[]
+  readonly scenario: Scenario
 }
+
+/**
+ * The levers a visitor can pull. Each one changes an input to the same solver, never a result:
+ * a carbon price is added to every unit's cost in proportion to what it emits, so the merit
+ * order re-sorts itself; demand and wind are scaled before dispatch, not after.
+ */
+export type Scenario = {
+  /** £ per tonne of CO₂, charged on every megawatt-hour in proportion to its emissions. */
+  readonly carbonPrice: number
+  /** Multiplier on regional demand — a heatwave is 1.15, a quiet Sunday 0.9. */
+  readonly demandScale: number
+  /** Multiplier on wind availability — a calm day is 0.3, a storm front 1.3 (capped at 1). */
+  readonly windScale: number
+}
+
+export const BASELINE: Scenario = {
+  carbonPrice: 0,
+  demandScale: 1,
+  windScale: 1,
+}
+
+/**
+ * A unit's short-run cost under a carbon price. `carbon` is gCO₂/kWh, which is kg/MWh, so a
+ * tonne price per MWh is carbon / 1000 × price. Gas at 352 g and £50/t gains £17.60; nuclear
+ * and the renewables gain nothing, which is the whole point of the instrument.
+ */
+export const costWithCarbon = (
+  cost: number,
+  carbon: number,
+  carbonPrice: number
+) => cost + (carbon / 1000) * carbonPrice
 
 const HOURS_PER_PERIOD = 0.5
 const RAMP_PER_PERIOD = (unit: Unit) => unit.rampRate * 60 * HOURS_PER_PERIOD
@@ -68,24 +100,51 @@ const RAMP_PER_PERIOD = (unit: Unit) => unit.rampRate * 60 * HOURS_PER_PERIOD
  * the cheap one on the table, which is the one thing a merit order exists to prevent.
  */
 const LINK = "__link__"
-const MERIT: readonly { id: string; cost: number; unit?: Unit }[] = [
-  ...UNITS.map((unit) => ({ id: unit.id, cost: unit.marginalCost, unit })),
-  { id: LINK, cost: INTERCONNECTOR.importCost },
-].sort((a, b) => a.cost - b.cost)
+type Merit = readonly { id: string; cost: number; unit?: Unit }[]
+
+/** Built per solve, because the carbon price changes who is cheap. */
+const meritOrder = (scenario: Scenario): Merit =>
+  [
+    ...UNITS.map((unit) => ({
+      id: unit.id,
+      cost: costWithCarbon(
+        unit.marginalCost,
+        unit.carbon,
+        scenario.carbonPrice
+      ),
+      unit,
+    })),
+    {
+      id: LINK,
+      cost: costWithCarbon(
+        INTERCONNECTOR.importCost,
+        INTERCONNECTOR.carbon,
+        scenario.carbonPrice
+      ),
+    },
+  ].sort((a, b) => a.cost - b.cost)
 
 function solvePeriod(
   period: number,
   previous: Map<string, number>,
-  offline: ReadonlySet<string>
+  offline: ReadonlySet<string>,
+  scenario: Scenario,
+  merit: Merit
 ): Period {
-  const demand = DEMAND[period]
+  const demand = Math.round(DEMAND[period] * scenario.demandScale)
   const mw = new Map<string, number>()
   const availableOf = new Map<string, number>()
+  const costOf = (unit: Unit) =>
+    costWithCarbon(unit.marginalCost, unit.carbon, scenario.carbonPrice)
 
   for (const unit of UNITS) {
+    const weather =
+      unit.fuel === "wind"
+        ? Math.min(1, availability(unit.fuel, period) * scenario.windScale)
+        : availability(unit.fuel, period)
     const available = offline.has(unit.id)
       ? 0
-      : Math.round(unit.capacity * availability(unit.fuel, period))
+      : Math.round(unit.capacity * weather)
     availableOf.set(unit.id, available)
     mw.set(unit.id, 0)
   }
@@ -145,14 +204,14 @@ function solvePeriod(
   let residual = demand - supplied
   let interconnector = 0
 
-  for (const step of MERIT) {
+  for (const step of merit) {
     if (residual <= 0.0001) break
 
     if (step.id === LINK) {
       interconnector = Math.min(residual, INTERCONNECTOR.capacity)
       if (interconnector > 0) {
         residual -= interconnector
-        price = INTERCONNECTOR.importCost
+        price = step.cost
         marginal = INTERCONNECTOR.name
       }
       continue
@@ -176,7 +235,7 @@ function solvePeriod(
       mw.set(unit.id, current + take)
       residual -= take
     }
-    price = unit.marginalCost
+    price = costOf(unit)
     marginal = unit.name
   }
 
@@ -192,8 +251,21 @@ function solvePeriod(
      * in, and the order that costs least.
      */
     let surplus = -residual
+
+    /*
+     * If the link is importing, the first megawatt to give back is an imported one. This
+     * branch used to write the export straight over the import, and a greedy commitment that
+     * overshot by a few hundred megawatts while the link was running flat out made 1,000 MW
+     * of import disappear from the books. The baseline never hit it — only the battery sits
+     * behind the import there, and a battery has no minimum stable output — a £150 carbon
+     * price put gas behind the import and the balance test found it in the first period.
+     */
+    const giveBack = Math.min(Math.max(0, interconnector), surplus)
+    interconnector -= giveBack
+    surplus -= giveBack
+
     const toExport = Math.min(surplus, INTERCONNECTOR.capacity)
-    interconnector = -toExport
+    interconnector -= toExport
     surplus -= toExport
 
     for (const unit of UNITS) {
@@ -206,9 +278,7 @@ function solvePeriod(
       surplus -= cut
     }
 
-    for (const unit of [...UNITS].sort(
-      (a, b) => b.marginalCost - a.marginalCost
-    )) {
+    for (const unit of [...UNITS].sort((a, b) => costOf(b) - costOf(a))) {
       if (surplus <= 0.0001) break
       if (unit.marginalCost === 0) continue
       const current = mw.get(unit.id) ?? 0
@@ -222,8 +292,10 @@ function solvePeriod(
       surplus -= cut
     }
 
-    price = INTERCONNECTOR.exportPrice
-    marginal = "export"
+    if (interconnector < 0) {
+      price = INTERCONNECTOR.exportPrice
+      marginal = "export"
+    }
   }
 
   const outputs = UNITS.map((unit) => ({
@@ -259,21 +331,25 @@ function solvePeriod(
  * period has nothing before it. The second pass starts from the last period of the first, so
  * the day is consistent with itself at midnight instead of with an invented warm start.
  */
-export function solve(offline: readonly string[] = []): Solution {
+export function solve(
+  offline: readonly string[] = [],
+  scenario: Scenario = BASELINE
+): Solution {
   const off = new Set(offline)
+  const merit = meritOrder(scenario)
   let previous = new Map<string, number>(UNITS.map((u) => [u.id, 0]))
   let periods: Period[] = []
 
   for (let pass = 0; pass < 2; pass++) {
     periods = []
     for (let p = 0; p < PERIODS; p++) {
-      const solved = solvePeriod(p, previous, off)
+      const solved = solvePeriod(p, previous, off, scenario, merit)
       periods.push(solved)
       previous = new Map(solved.outputs.map((o) => [o.unit.id, o.mw]))
     }
   }
 
-  return { periods, offline }
+  return { periods, offline, scenario }
 }
 
 /** Everything serving demand in a period: generation plus any import. */

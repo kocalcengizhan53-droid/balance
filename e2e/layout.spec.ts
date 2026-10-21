@@ -60,7 +60,7 @@ for (const width of [390, 768, 1280, 1600]) {
   })
 }
 
-test("every figure is drawn, and drawn again in dark mode", async ({
+test("every figure is drawn, and drawn again in the light theme", async ({
   page,
 }) => {
   await page.goto("/")
@@ -76,8 +76,9 @@ test("every figure is drawn, and drawn again in dark mode", async ({
       .locator("svg rect")
   ).not.toHaveCount(0)
 
-  await page.getByRole("button", { name: /Switch to dark theme/ }).click()
-  await expect(page.locator("html")).toHaveClass(/dark/)
+  // Dark is the default; the designed alternative is light, and it has to draw too.
+  await page.getByRole("button", { name: /Switch to light theme/ }).click()
+  await expect(page.locator("html")).not.toHaveClass(/dark/)
   await expect(areas.locator("svg > path[fill^='var(--fuel']")).toHaveCount(8)
-  await page.screenshot({ path: "qa-output/dark.png", fullPage: true })
+  await page.screenshot({ path: "qa-output/light.png", fullPage: true })
 })

@@ -1,4 +1,5 @@
 import { useId, useState } from "react"
+import { motion } from "motion/react"
 
 import { useElementWidth } from "@/components/use-element-width"
 
@@ -19,6 +20,14 @@ import { PERIODS, periodLabel } from "@/lib/grid/profiles"
  */
 
 const PAD = { top: 12, right: 8, bottom: 22, left: 44 }
+
+/*
+ * A change in the solution is drawn as a change: the bands slide to their new shape rather
+ * than cutting to it, so a reader who trips a unit sees which fuels moved to cover it. The
+ * paths always carry the same number of points, which is what lets the `d` string tween.
+ */
+const EASE = { duration: 0.6, ease: [0.16, 1, 0.3, 1] } as const
+const FOLLOW = { duration: 0.22, ease: "easeOut" } as const
 
 /** 2px of surface between bands, in user units, so neighbours read apart without a stroke. */
 const GAP = 2
@@ -116,7 +125,7 @@ export function DispatchChart({
   }
 
   return (
-    <figure className="rounded-lg border border-border/70 bg-card">
+    <figure className="panel">
       <figcaption className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1 border-b border-border/60 px-4 py-3">
         <h2 className="text-sm font-semibold tracking-tight">
           Dispatch across the day
@@ -175,9 +184,11 @@ export function DispatchChart({
           </text>
 
           {stacks.map((stack) => (
-            <path
+            <motion.path
               key={stack.series}
-              d={area(stack.points)}
+              initial={false}
+              animate={{ d: area(stack.points) }}
+              transition={EASE}
               fill={fuelVar(stack.series)}
             />
           ))}
@@ -208,16 +219,20 @@ export function DispatchChart({
                   strokeWidth={2}
                 />
               </pattern>
-              <path
-                d={shortfallArea}
+              <motion.path
+                initial={false}
+                animate={{ d: shortfallArea }}
+                transition={EASE}
                 fill={`url(#${id}-short)`}
                 opacity={0.5}
               />
             </>
           ) : null}
 
-          <path
-            d={`M${demandLine}`}
+          <motion.path
+            initial={false}
+            animate={{ d: `M${demandLine}` }}
+            transition={EASE}
             fill="none"
             className="stroke-foreground"
             strokeWidth={2}
@@ -226,10 +241,11 @@ export function DispatchChart({
           />
 
           {/* The crosshair finds the X; the reader aims at a time, not at a two-pixel line. */}
-          <line
-            x1={x(active)}
+          <motion.line
+            initial={false}
+            animate={{ x1: x(active), x2: x(active) }}
+            transition={FOLLOW}
             y1={PAD.top}
-            x2={x(active)}
             y2={PAD.top + PLOT.h}
             className="stroke-foreground"
             strokeWidth={1}
@@ -310,7 +326,7 @@ export function DispatchChart({
           aria-valuetext={periodLabel(period)}
           className="h-1 w-full cursor-pointer accent-foreground"
         />
-        <span className="shrink-0 text-sm font-medium tabular-nums">
+        <span className="shrink-0 figure text-sm font-medium">
           {periodLabel(period)}
         </span>
       </label>

@@ -1,5 +1,9 @@
 import { expect, test } from "./fixtures"
 
+/** The single-line diagram: the one place a unit's control stands still. */
+const diagram = (page: import("@playwright/test").Page) =>
+  page.locator("figure", { has: page.getByText("Where it is coming from") })
+
 /**
  * What the dashboard is for: taking plant out and watching the system answer.
  *
@@ -14,7 +18,7 @@ test("taking the two largest gas stations out raises the price, cuts carbon, and
   await page.goto("/")
 
   const price = page.locator('[data-figure="Price"]')
-  const carbon = page.locator('[data-figure="Carbon intensity"]')
+  const carbon = page.locator('[data-figure^="Carbon intensity"]')
   const before = {
     price: Number((await price.innerText()).match(/£(\d+)/)?.[1]),
     carbon: Number((await carbon.innerText()).match(/(\d+)/)?.[1]),
@@ -22,7 +26,7 @@ test("taking the two largest gas stations out raises the price, cuts carbon, and
   await expect(page.getByRole("alert")).toHaveCount(0)
 
   for (const name of ["Calder A", "Calder B"]) {
-    await page
+    await diagram(page)
       .getByRole("button", { name: new RegExp(`^${name}, \\d`) })
       .click()
   }
@@ -41,7 +45,7 @@ test("taking the two largest gas stations out raises the price, cuts carbon, and
   await expect(page.getByRole("alert")).toContainText("Demand not met")
   // Both rows are struck out of the diagram and the table at once.
   await expect(
-    page.getByRole("button", { name: /^Calder A, \d/ })
+    diagram(page).getByRole("button", { name: /^Calder A, \d/ })
   ).toHaveAttribute("aria-pressed", "true")
   await expect(page.getByRole("row", { name: /^Calder A\b/ })).toContainText(
     "offline"
@@ -53,7 +57,7 @@ test("returning the units to service clears the shortfall", async ({
 }) => {
   await page.goto("/")
   for (const name of ["Calder A", "Calder B"]) {
-    await page
+    await diagram(page)
       .getByRole("button", { name: new RegExp(`^${name}, \\d`) })
       .click()
   }
@@ -63,6 +67,6 @@ test("returning the units to service clears the shortfall", async ({
 
   await expect(page.getByRole("alert")).toHaveCount(0)
   await expect(
-    page.getByRole("button", { name: /^Calder A, \d/ })
+    diagram(page).getByRole("button", { name: /^Calder A, \d/ })
   ).toHaveAttribute("aria-pressed", "false")
 })

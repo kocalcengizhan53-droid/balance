@@ -1,13 +1,15 @@
+import { AnimatePresence, motion } from "motion/react"
+
 import { DispatchChart } from "@/features/dashboard/DispatchChart"
 import { MeritCurve } from "@/features/dashboard/MeritCurve"
+import { ScenarioPanel } from "@/features/dashboard/ScenarioPanel"
 import { Schematic } from "@/features/dashboard/Schematic"
-import { UnitTable } from "@/features/dashboard/UnitTable"
 import { StatTile } from "@/features/dashboard/StatTile"
+import { UnitTable } from "@/features/dashboard/UnitTable"
 import { useGrid } from "@/features/dashboard/useGrid"
+import { RegionScene } from "@/features/scene/RegionScene"
 import { energy, served } from "@/lib/grid/dispatch"
 import { periodLabel } from "@/lib/grid/profiles"
-
-const gw = (mw: number) => (mw / 1000).toFixed(2)
 
 export function DashboardPage() {
   const grid = useGrid()
@@ -22,65 +24,81 @@ export function DashboardPage() {
     dayEnergy
 
   return (
-    <main className="mx-auto w-full max-w-[120rem] px-4 py-6 sm:px-6">
-      <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Dispatch</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            A fictional region, solved half-hourly. Generation equals demand in
-            every period.
-          </p>
-        </div>
-        <p className="text-sm text-muted-foreground tabular-nums">
-          Settlement period {now.period + 1} of 48 · {periodLabel(now.period)}
-        </p>
-      </div>
-
+    <main className="mx-auto w-full max-w-[120rem] px-4 pb-12 sm:px-6">
       {/*
-        One hero figure per view, and it is the carbon intensity: the number that makes the
-        rest of the dashboard about something. Everything else is a tile.
+        The region first, as a place, with the instruments laid over its foot. The scene is
+        the thing the rest of the page is reading; a visitor should meet it before the charts.
       */}
-      <section className="mt-6 grid gap-3 lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)]">
-        <div
-          data-figure="Carbon intensity"
-          className="rounded-lg border border-border/70 bg-card px-5 py-4"
-        >
-          <p className="text-xs font-medium text-muted-foreground">
-            Carbon intensity, now
-          </p>
-          <p className="mt-2 flex items-baseline gap-2">
-            <span className="text-5xl leading-none font-semibold tracking-tight">
-              {Math.round(now.carbonIntensity)}
-            </span>
-            <span className="text-sm text-muted-foreground">gCO₂/kWh</span>
-          </p>
-          <p className="mt-3 text-xs text-muted-foreground">
-            {Math.round(dayCarbon)} across the day · {now.marginalUnit} is
-            setting the price
-          </p>
+      <section className="relative -mx-4 sm:-mx-6">
+        <div className="relative flex h-[62svh] min-h-[30rem] flex-col lg:block lg:h-[66svh] lg:min-h-[36rem]">
+          {/* On a phone the title sits above the scene in flow; on a wide screen it floats over it. */}
+          <div className="pointer-events-none px-4 pt-5 sm:px-6 lg:absolute lg:inset-x-6 lg:top-5 lg:z-10 lg:px-0 lg:pt-0">
+            <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+              Dispatch
+            </h1>
+            <p className="mt-1 max-w-md text-sm text-muted-foreground">
+              A fictional region, solved half-hourly. Generation equals demand
+              in every period — drag to look around, press a plant to take it
+              out.
+            </p>
+            <p className="mt-2 label">
+              Settlement period {String(now.period + 1).padStart(2, "0")} of 48
+              · {periodLabel(now.period)}
+            </p>
+          </div>
+          <div className="relative min-h-0 flex-1 lg:absolute lg:inset-0">
+            <RegionScene
+              fallback={
+                <div className="absolute inset-0 px-4 pt-24 sm:px-6">
+                  <Schematic
+                    now={now}
+                    offline={grid.offline}
+                    onToggle={grid.toggle}
+                  />
+                </div>
+              }
+            />
+          </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-          <StatTile label="Demand" value={gw(now.demand)} unit="GW" />
+        {/* The instruments, riding up over the foot of the scene on a wide screen. */}
+        <div className="relative z-10 grid grid-cols-2 gap-3 px-4 pt-3 sm:px-6 lg:-mt-28 lg:grid-cols-[21rem_repeat(4,minmax(0,1fr))_17rem] lg:pt-0">
+          <StatTile
+            hero
+            label="Carbon intensity, now"
+            value={now.carbonIntensity}
+            unit="gCO₂/kWh"
+            note={`${Math.round(dayCarbon)} across the day · ${now.marginalUnit} is setting the price`}
+            className="col-span-2 lg:col-span-1"
+          />
+          <StatTile
+            label="Demand"
+            value={now.demand / 1000}
+            decimals={2}
+            unit="GW"
+          />
           <StatTile
             label="Price"
-            value={`£${Math.round(now.price)}`}
+            value={now.price}
+            prefix="£"
             unit="/MWh"
             note={now.marginalUnit}
           />
           <StatTile
             label="Interconnector"
-            value={`${now.interconnector >= 0 ? "+" : "−"}${Math.abs(Math.round(now.interconnector))}`}
+            value={Math.abs(now.interconnector)}
+            prefix={now.interconnector >= 0 ? "+" : "−"}
             unit="MW"
             note={now.interconnector >= 0 ? "importing" : "exporting"}
           />
           <StatTile
             label="Spare capacity"
-            value={Math.round(headroom).toLocaleString()}
+            value={headroom}
             unit="MW"
-            note={`${Math.round(generation).toLocaleString()} MW generating`}
+            note={`${Math.round(generation).toLocaleString("en-GB")} MW generating`}
             tone={headroom < 500 ? "warning" : "normal"}
           />
+          <ScenarioPanel className="glass col-span-2 lg:col-span-1" />
         </div>
       </section>
 
@@ -88,23 +106,31 @@ export function DashboardPage() {
         The one condition the whole thing exists to avoid, said in words. Everything else on
         this page is a reading; this is a verdict.
       */}
-      {shortfall.length > 0 ? (
-        <p
-          role="alert"
-          className="mt-3 rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive"
-        >
-          <strong className="font-semibold">Demand not met.</strong>{" "}
-          {shortfall.length} of 48 periods are short, the worst by{" "}
-          {Math.round(
-            Math.max(...shortfall.map((p) => p.unserved))
-          ).toLocaleString()}{" "}
-          MW at{" "}
-          {periodLabel(
-            shortfall.reduce((a, b) => (b.unserved > a.unserved ? b : a)).period
-          )}
-          .
-        </p>
-      ) : null}
+      <AnimatePresence initial={false}>
+        {shortfall.length > 0 ? (
+          <motion.p
+            key="short"
+            role="alert"
+            initial={{ opacity: 0, y: -8, height: 0 }}
+            animate={{ opacity: 1, y: 0, height: "auto" }}
+            exit={{ opacity: 0, y: -8, height: 0 }}
+            transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+            className="mt-3 overflow-hidden rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+          >
+            <strong className="font-semibold">Demand not met.</strong>{" "}
+            {shortfall.length} of 48 periods are short, the worst by{" "}
+            {Math.round(
+              Math.max(...shortfall.map((p) => p.unserved))
+            ).toLocaleString("en-GB")}{" "}
+            MW at{" "}
+            {periodLabel(
+              shortfall.reduce((a, b) => (b.unserved > a.unserved ? b : a))
+                .period
+            )}
+            .
+          </motion.p>
+        ) : null}
+      </AnimatePresence>
 
       <section className="mt-3">
         <DispatchChart

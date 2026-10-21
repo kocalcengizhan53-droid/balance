@@ -26,7 +26,7 @@ export function UnitTable({
   const outputOf = (id: string) => now.outputs.find((o) => o.unit.id === id)
 
   return (
-    <section className="rounded-lg border border-border/70 bg-card">
+    <section className="panel">
       <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1 border-b border-border/60 px-4 py-3">
         <h2 className="text-sm font-semibold tracking-tight">Fleet</h2>
         {offline.length > 0 ? (
