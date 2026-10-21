@@ -74,7 +74,7 @@ export function UnitSheet({
         {unit && out ? (
           <div className="flex h-full flex-col gap-5 overflow-y-auto px-5 pb-6">
             <SheetHeader className="px-0">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 pr-8">
                 <span
                   className="size-2.5 rounded-sm"
                   style={{ backgroundColor: fuelVar(unit.fuel as Series) }}

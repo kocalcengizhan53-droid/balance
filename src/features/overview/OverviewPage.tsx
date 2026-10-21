@@ -84,7 +84,7 @@ export function OverviewPage() {
             decimals={2}
             unit="GW"
             goodWhen="none"
-            insight={`${Math.round(generation).toLocaleString("en-GB")} MW generating`}
+            insight={`${Math.round(generation).toLocaleString("en-GB")} MW on`}
             basis={basis}
           />
           <KpiCard
@@ -118,9 +118,7 @@ export function OverviewPage() {
             unit="MW"
             goodWhen="up"
             tone={headroom < 500 ? "warning" : "normal"}
-            insight={
-              headroom < 500 ? "Reserve below 500 MW" : "Reserve healthy"
-            }
+            insight={headroom < 500 ? "Reserve thin" : "Reserve healthy"}
             basis={basis}
           />
           <ScenarioPanel className="glass col-span-2 lg:col-span-1" />

@@ -1,75 +1,75 @@
 # Balance
 
-A control room for a region that does not exist, solved half-hourly, where every number on the screen — and every particle moving across the map — is the output of one model.
-
-Eleven generating units, four nodes, an interconnector and a city, dispatched across forty-eight settlement periods. Press **Play** and the day runs: the sun crosses the region, the solar farm wakes at nine, the city lights come up at dusk, and the instruments roll with the clock. Press a plant to take it out and the whole day re-solves — a dearer unit is called, the price moves, the carbon intensity moves with it, the particles feeding the city from the east thicken, and if the system can no longer meet demand the frequency droops and it says so.
+A grid control room for a region that does not exist, solved half-hourly, built the way a product dashboard is built — a rail, four pages, a command palette, KPI cards that compare against the last half-hour, a table you can filter and page — where every number on every page, and every particle moving across the map, is the output of one model.
 
 **Live:** <https://balance-dispatch.pages.dev>
 
-![The control room at the evening peak: the region in three dimensions, power moving along the lines to the city, the instruments laid over its foot](docs/dashboard.png)
+![Overview: the region in three dimensions, power moving along the lines to the city, KPI cards with their trend against the previous half-hour, the levers](docs/dashboard.png)
 
 ---
 
 ## The one rule
 
-Nothing is typed into a component. Every figure — the tiles, the masthead clock and frequency, the stacked day, the supply curve, the diagram, the table, and the width, count and speed of every particle in the scene — is derived from [`src/lib/grid/`](src/lib/grid), and the arithmetic has one invariant:
+Nothing is typed into a component. Every figure — the rail's status card, the masthead clock and frequency, the KPI trend badges, the stacked day, the supply curve, the settlement table, the events feed, and the width, count and speed of every particle in the scene — is derived from [`src/lib/grid/`](src/lib/grid), and the arithmetic has one invariant:
 
 ```
 generation + imports + unserved === demand + exports
 ```
 
-to within 0.1 MW, in all forty-eight periods, under every lever, and still true with the two largest units out. That is the first test in [`dispatch.test.ts`](src/lib/grid/dispatch.test.ts), and it is the reason the rest of the room can be trusted to agree with itself.
+to within 0.1 MW, in all forty-eight periods, under every lever, and still true with the two largest units out. That is the first test in [`dispatch.test.ts`](src/lib/grid/dispatch.test.ts), and it is the reason four pages can be trusted to agree with each other.
+
+## The pages
+
+**Overview.** The region as a place: plants where they stand, sized by capacity and lit by their output; power as particles, a count of them proportional to the megawatts and a speed set by how hard the plant behind them is working; the sun crossing with the clock, the city lighting at dusk. Beneath it, the instruments: five KPI cards with a trend badge against the previous half-hour, the day stacked by fuel with a range control and a pointer readout, the system as a single-line diagram, and an events feed — every line of it a diff between two consecutive solves.
+
+**Fleet.** The table every template has, with the solver underneath it: tabs by status, search, a fuel filter, a column menu, row selection with a bulk action, sortable headers, status badges, a pager, and a drawer per unit with its day as a sparkline and the one switch that takes it out.
+
+![The fleet table, and the drawer behind a row](docs/fleet-drawer.png)
+
+**Market.** Price and carbon across the day as two charts rather than one with two axes, the supply curve for the selected half-hour, and the settlement run paged twelve half-hours at a time — the statement a trading desk would reconcile against.
+
+![The market: price and carbon across the day, the supply curve, the settlement run](docs/market.png)
+
+**Scenarios.** Three levers — carbon price, demand, wind — five presets worth pressing, and every figure against the baseline. Each comparison is two solves of the same model, nothing interpolated.
+
+![A bad evening: calm, hot and priced — cost up 95%, imports up six-fold, thirteen half-hours short](docs/scenarios.png)
+
+The view's inputs live in the URL — `?out=calder-a,calder-b&carbon=60&demand=1.1&wind=0.4&t=36` — so a scenario is a link somebody can send, and a reload is not a reset. Only inputs are stored, never a result.
+
+![Two gas stations out and a carbon price on, from a link: the plants struck through, the frequency drooping, the rail saying so](docs/shortfall.png)
 
 ## What the model actually does
 
-Not a stacked chart with plausible numbers under it. A merit-order dispatch with the constraints that make the merit order interesting:
+A merit-order dispatch with the constraints that make the merit order interesting:
 
 - **Minimum stable generation.** A thermal plant below its floor is not turned down, it is off. Committing one is a step change, not a slope.
 - **Ramp rates.** Output can only move so fast per period, and the day is solved twice so that midnight is consistent with itself rather than starting cold.
 - **Unit commitment.** Greedy, cheapest first, with must-run plant and free fuel on the system before the market is asked anything.
-- **A constrained-on unit does not set the price.** At 04:00 both Calder stations are generating at £62 and £64 while the region is exporting at £41: they are running because they cannot shut down and restart inside half an hour, not because anybody is paying for them.
+- **A constrained-on unit does not set the price.** At 04:00 both Calder stations are generating at £62 and £64 while the region is exporting at £41: they are running because they cannot shut down and restart inside half an hour, not because anybody is paying for them. The fleet table calls that state *constrained* and gives it its own tab.
 
 The last of those arrived as a failing test. The test asserted that the price equals the cost of the dearest running plant, which is the intuition, and the model disagreed — biomass at £79 was on the system while the price was £71. The model was right and the test was the defect, which is the kind of result that only shows up when the model is real enough to argue with.
 
-### The levers
-
-Three inputs to the same solver, each one a question a visitor might actually ask of a grid:
-
-- **Carbon price**, £0–150 per tonne, charged on every unit in proportion to what it emits — gas at 352 g/kWh gains £17.60 per £50, nuclear and the renewables gain nothing — so the merit order re-sorts itself and the staircase slides into its new order on screen.
-- **Demand**, −20% to +25%: a quiet Sunday or a heatwave, scaled before dispatch, never after.
-- **Wind**, 20% to 130%: a still day or a front coming through.
-
-![Two gas stations out and a £60 carbon price on: the plants struck through and dark, the battery lit, the link flat out, the frequency drooping, the shortfall declared](docs/shortfall.png)
-
-The levers found a defect the baseline could not. With the link importing flat out and a thermal unit committed at its minimum stable output overshooting demand, the surplus branch wrote the export straight over the import — 1,000 MW vanished from the books. The baseline never reaches that state: only the battery sits behind the import in its merit order, and a battery has no minimum stable output. A £150 carbon price put gas behind the import, and the balance test failed in the first period. The link now gives back import before it exports, which is also what a control room does.
+The levers found a second defect the baseline could not reach. With the link importing flat out and a thermal unit committed at its minimum stable output overshooting demand, the surplus branch wrote the export straight over the import — 1,000 MW vanished from the books. A £150 carbon price put gas behind the import, and the balance test failed in the first period. The link now gives back import before it exports, which is also what a control room does.
 
 ## The room
 
-Dark by default, because the room it is modelled on is dark: a wall of instruments read from across a desk, where the surface recedes and the figures and the live marks carry the light. Every surface is biased a few steps toward blue so the fuel colours sit on something with a temperature; every figure is set in a mono instrument face so the digits hold still as the clock runs; one amber means *live* — the clock, the playhead, the ring on whatever has focus — and is used for nothing else. The light theme is designed rather than inverted.
+Dark by default, because the room it is modelled on is dark. Every surface is biased a few steps toward blue so the fuel colours sit on something with a temperature; every figure is set in a mono instrument face so the digits hold still as the clock runs; one amber means *live* and is used for nothing else. The light theme is designed rather than inverted.
 
-![The light theme: the same room on cool paper](docs/light.png)
+![The light theme](docs/light.png)
 
-**The region** is a [React Three Fiber](src/features/scene/RegionScene.tsx) scene that fetches nothing — three light panels baked once, a terrain of three sines, colours read from the page's own stylesheet so the plants are exactly the hues the charts use. Plants stand where they stand, sized by capacity and lit by their output. Power moves as particles: each line carries a count of them proportional to its megawatts, travelling at a speed set by how hard the plant behind them is working, so a nuclear station flat out and a battery flat out move at the same speed and are nothing like the same stream. Drag to orbit; a viewport-aware camera pulls back and widens the lens on a phone; where there is no WebGL the single-line diagram stands in.
+The scene is [React Three Fiber](src/features/scene/RegionScene.tsx) and fetches nothing — three light panels baked once, a terrain of three sines, colours read from the page's own stylesheet so the plants are exactly the hues the charts use. It arrives in its own chunk after the instruments have painted, a viewport-aware camera pulls back and widens on a phone, and where there is no WebGL the single-line diagram stands in. Its labels are ordinary DOM moved by a projector each frame rather than drei's portalled `<Html>`, which on React 19 removes a node its parent has already removed every time the page is left.
 
-**The clock** runs the day in 720 ms half-hours. Figures roll rather than jump, the dispatch bands slide to their new shape, the playhead glides, and the masthead carries the time, a live lamp and the system frequency — 50.00 Hz on a balanced system, derived from the solver's unserved demand and falling when it is short.
-
-![The day, stacked by fuel, with the demand line over the top and the playhead at 18:00](docs/day.png)
-
-![The system as a single-line diagram: every unit on its own row, feeding its node, feeding one busbar](docs/schematic.png)
-
-The fuel palette is checked rather than chosen: eight categorical hues validated for deuteranopia, protanopia and tritanopia separation, normal-vision separation and contrast against each theme's card surface, with a separate set of steps for the dark theme. Four hues sit under 3:1 on their surface, which is why every series also has a labelled readout and a table, and identity is never carried by colour alone.
+The fuel palette is checked rather than chosen: eight categorical hues validated for deuteranopia, protanopia and tritanopia separation, normal-vision separation and contrast against each theme's card surface. Four hues sit under 3:1 on their surface, which is why every series also has a labelled readout and a table.
 
 ## The checks
 
-Eleven Vitest tests on the model. Thirty-three Playwright checks in [`e2e/`](e2e), run against the production bundle on a desktop and a Pixel 7.
+Seventeen Vitest tests on the model and the readings derived from it. Forty-four Playwright checks in [`e2e/`](e2e), run against the production bundle on a desktop and a Pixel 7.
 
-The load-bearing one is [`figures.spec.ts`](e2e/figures.spec.ts). The rule above is that no number is typed into a component, and a unit test cannot see that — it can only check the solver, and the solver was never what was at risk. So the browser re-solves the day from the view's own inputs and compares the result against the text actually painted, in three states: at rest, after the period changes, and with two units offline.
+The load-bearing one is [`figures.spec.ts`](e2e/figures.spec.ts). The rule above is that no number is typed into a component, and a unit test cannot see that — it can only check the solver, and the solver was never what was at risk. So the browser re-solves the day from the view's own inputs and compares the result against the text actually painted — on the overview and row by row on the fleet page, at rest, after the period changes, and with two units offline.
 
-[`layout.spec.ts`](e2e/layout.spec.ts) measures the painted size of every piece of text inside every SVG, at four viewport widths, and fails below 9px. It exists because the dispatch chart set its axis labels in viewBox units: 11px in the source, four pixels on a phone. That is not small type, it is no type, and it passed every other check there was.
+[`layout.spec.ts`](e2e/layout.spec.ts) measures the painted size of every piece of text inside every SVG at four widths and fails below 9px, because the dispatch chart once set its axis labels in viewBox units: 11px in the source, four pixels on a phone. [`shell.spec.ts`](e2e/shell.spec.ts) drives the rail, the palette, the table's tabs, search, column menu, selection, drawer and pager, the settlement run's pages and a scenario preset.
 
-[`levers.spec.ts`](e2e/levers.spec.ts) presses Play and watches the clock move, prices carbon and watches the system get dearer and no dirtier, stills the wind and watches the link take the strain.
-
-**Neither of the first two was trusted until the bug it was written for had been put back.** Typing a fixed `£96` into the price tile is invisible at 18:00, where £96 happens to be the right answer, and fails the moment the period moves or a unit trips. Putting the merit curve back on a fixed canvas fails at 390px and nowhere else — which is exactly where that bug bites.
+Three defects in the product that only the browser suite found, none of them in the specs: cmdk's input rendering outside cmdk's root inside the Base UI dialog, drei's labels tearing down a removed node on navigation, and Base UI's `DropdownMenuLabel` throwing outside a `DropdownMenuGroup` — the column menu was crashing the fleet page in production. **No check here is trusted until the bug it was written for has been put back**: typing a fixed `£96` into the price tile is invisible at 18:00, where £96 is the right answer, and fails the moment the period moves.
 
 ## Running it
 
@@ -90,7 +90,7 @@ npm run deploy       # builds and ships dist/ to Cloudflare Pages
 
 ## Stack
 
-Vite 8 · React 19.3 with the React Compiler · TypeScript 6 · Tailwind CSS v4 · shadcn/ui on Base UI · React Router 8 · three 0.186 / React Three Fiber 9.8 / drei · Motion 14 · Vitest 5 · Playwright · Cloudflare Pages.
+Vite 8 · React 19.3 with the React Compiler · TypeScript 6 · Tailwind CSS v4 · shadcn/ui on Base UI · React Router 8 · three 0.186 / React Three Fiber 9.8 / drei · Motion 14 · cmdk · Vitest 5 · Playwright · Cloudflare Pages.
 
 No charting library: every mark is an SVG path built from the solved periods, so the geometry and the figures cannot come from different places.
 
