@@ -1,3 +1,4 @@
+import { Suspense, lazy } from "react"
 import { AnimatePresence, motion } from "motion/react"
 
 import { DispatchChart } from "@/features/dashboard/DispatchChart"
@@ -7,9 +8,19 @@ import { Schematic } from "@/features/dashboard/Schematic"
 import { StatTile } from "@/features/dashboard/StatTile"
 import { UnitTable } from "@/features/dashboard/UnitTable"
 import { useGrid } from "@/features/dashboard/useGrid"
-import { RegionScene } from "@/features/scene/RegionScene"
 import { energy, served } from "@/lib/grid/dispatch"
 import { periodLabel } from "@/lib/grid/profiles"
+
+/*
+ * The scene is three, fiber and drei — two thirds of the bundle. It arrives in its own chunk,
+ * after the instruments have painted, and the diagram holds its place until it does. A
+ * visitor on a slow link reads the room first and watches it become a place.
+ */
+const RegionScene = lazy(() =>
+  import("@/features/scene/RegionScene").then((m) => ({
+    default: m.RegionScene,
+  }))
+)
 
 export function DashboardPage() {
   const grid = useGrid()
@@ -22,6 +33,12 @@ export function DashboardPage() {
   const dayCarbon =
     periods.reduce((s, p) => s + p.carbonIntensity * served(p) * 0.5, 0) /
     dayEnergy
+
+  const placeholder = (
+    <div className="absolute inset-0 px-4 pt-24 sm:px-6">
+      <Schematic now={now} offline={grid.offline} onToggle={grid.toggle} />
+    </div>
+  )
 
   return (
     <main className="mx-auto w-full max-w-[120rem] px-4 pb-12 sm:px-6">
@@ -47,17 +64,9 @@ export function DashboardPage() {
             </p>
           </div>
           <div className="relative min-h-0 flex-1 lg:absolute lg:inset-0">
-            <RegionScene
-              fallback={
-                <div className="absolute inset-0 px-4 pt-24 sm:px-6">
-                  <Schematic
-                    now={now}
-                    offline={grid.offline}
-                    onToggle={grid.toggle}
-                  />
-                </div>
-              }
-            />
+            <Suspense fallback={placeholder}>
+              <RegionScene fallback={placeholder} />
+            </Suspense>
           </div>
         </div>
 
