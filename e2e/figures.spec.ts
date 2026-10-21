@@ -4,7 +4,9 @@ import { expect, test } from "./fixtures"
 
 /** The single-line diagram: the one place a unit's control stands still. */
 const diagram = (page: import("@playwright/test").Page) =>
-  page.locator("figure", { has: page.getByText("Where it is coming from") })
+  page
+    .locator("figure", { has: page.getByText("Where it is coming from") })
+    .last()
 
 /**
  * The one rule, checked where it can actually be broken.
@@ -72,7 +74,7 @@ async function expectAgreement(page: Page) {
   // The diagram says the same thing in its accessible name, which is what a screen reader
   // is handed in place of the drawing.
   await expect(
-    page.getByRole("img", { name: /single-line diagram/ })
+    page.getByRole("img", { name: /single-line diagram/ }).last()
   ).toHaveAttribute(
     "aria-label",
     new RegExp(`Demand ${Math.round(s.demand)} megawatts`)

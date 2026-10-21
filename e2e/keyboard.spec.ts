@@ -2,7 +2,9 @@ import { expect, test } from "./fixtures"
 
 /** The single-line diagram: the one place a unit's control stands still. */
 const diagram = (page: import("@playwright/test").Page) =>
-  page.locator("figure", { has: page.getByText("Where it is coming from") })
+  page
+    .locator("figure", { has: page.getByText("Where it is coming from") })
+    .last()
 
 /**
  * Reached by Tab from the top of the document, not by calling focus().
