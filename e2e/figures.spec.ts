@@ -2,6 +2,32 @@ import type { Page } from "@playwright/test"
 
 import { expect, test } from "./fixtures"
 
+/** The fleet table is paged and sorted by output, so a unit that was taken out is on the last page. */
+async function rowFor(page: import("@playwright/test").Page, name: string) {
+  const row = page.getByRole("row", { name: new RegExp(`\\b${name}\\b`) })
+  const prev = page.getByRole("button", { name: "Previous page" })
+  while (!(await prev.isDisabled())) await prev.click()
+  for (let i = 0; i < 3; i++) {
+    if ((await row.count()) > 0) return row
+    const next = page.getByRole("button", { name: "Next page" })
+    if (await next.isDisabled()) break
+    await next.click()
+  }
+  return row
+}
+
+/** Navigate the way a visitor does — by the rail — so the view's state comes along. */
+async function toPage(
+  page: import("@playwright/test").Page,
+  name: string,
+  mobile: boolean
+) {
+  if (mobile)
+    await page.getByRole("button", { name: /toggle sidebar/i }).click()
+  await page.getByRole("link", { name, exact: true }).first().click()
+  await page.getByRole("heading", { level: 1, name }).waitFor()
+}
+
 /** The single-line diagram: the one place a unit's control stands still. */
 const diagram = (page: import("@playwright/test").Page) =>
   page
@@ -46,6 +72,17 @@ async function solved(page: Page) {
   })
 }
 
+/** The fleet page's rows, against the same solve. */
+async function expectFleetAgreement(page: Page, mobile: boolean) {
+  const s = await solved(page)
+  await toPage(page, "Fleet", mobile)
+  for (const unit of s.outputs) {
+    const row = await rowFor(page, unit.name)
+    await expect(row).toContainText(String(unit.mw.toLocaleString("en-GB")))
+    await expect(row).toContainText(unit.capacity.toLocaleString("en-GB"))
+  }
+}
+
 async function expectAgreement(page: Page) {
   const s = await solved(page)
 
@@ -62,12 +99,12 @@ async function expectAgreement(page: Page) {
     Math.abs(Math.round(s.link)).toLocaleString("en-GB")
   )
   await expect(figure(page, "Interconnector")).toContainText(
-    s.link >= 0 ? "importing" : "exporting"
+    s.link >= 0 ? /importing/i : /exporting/i
   )
   await expect(figure(page, "Spare capacity")).toContainText(
     Math.round(s.headroom).toLocaleString("en-GB")
   )
-  await expect(figure(page, "Spare capacity")).toContainText(
+  await expect(figure(page, "Demand")).toContainText(
     Math.round(s.generation).toLocaleString("en-GB")
   )
 
@@ -79,13 +116,6 @@ async function expectAgreement(page: Page) {
     "aria-label",
     new RegExp(`Demand ${Math.round(s.demand)} megawatts`)
   )
-
-  // And every row of the fleet table.
-  for (const unit of s.outputs) {
-    const row = page.getByRole("row", { name: new RegExp(`^${unit.name}\\b`) })
-    await expect(row).toContainText(String(unit.mw))
-    await expect(row).toContainText(String(unit.capacity))
-  }
 }
 
 test("the tiles, the diagram and the fleet table all show the solver's numbers", async ({
@@ -102,6 +132,13 @@ test("they still agree after the period changes", async ({ page }) => {
     .poll(() => page.evaluate(() => window.__app?.state.period))
     .toBe(12)
   await expectAgreement(page)
+})
+
+test("the fleet table shows the solver's numbers, row by row", async ({
+  page,
+}, info) => {
+  await page.goto("/")
+  await expectFleetAgreement(page, info.project.name === "mobile")
 })
 
 test("they still agree with two units offline", async ({ page }) => {

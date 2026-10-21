@@ -1,20 +1,18 @@
 import { Suspense, lazy } from "react"
 import { AnimatePresence, motion } from "motion/react"
+import { Link } from "react-router"
 
 import { DispatchChart } from "@/features/dashboard/DispatchChart"
-import { MeritCurve } from "@/features/dashboard/MeritCurve"
+import { KpiCard } from "@/features/dashboard/KpiCard"
 import { ScenarioPanel } from "@/features/dashboard/ScenarioPanel"
 import { Schematic } from "@/features/dashboard/Schematic"
-import { StatTile } from "@/features/dashboard/StatTile"
-import { UnitTable } from "@/features/dashboard/UnitTable"
 import { useGrid } from "@/features/dashboard/useGrid"
-import { energy, served } from "@/lib/grid/dispatch"
+import { EventsFeed } from "@/features/overview/EventsFeed"
 import { periodLabel } from "@/lib/grid/profiles"
 
 /*
  * The scene is three, fiber and drei — two thirds of the bundle. It arrives in its own chunk,
- * after the instruments have painted, and the diagram holds its place until it does. A
- * visitor on a slow link reads the room first and watches it become a place.
+ * after the instruments have painted, and the diagram holds its place until it does.
  */
 const RegionScene = lazy(() =>
   import("@/features/scene/RegionScene").then((m) => ({
@@ -22,17 +20,19 @@ const RegionScene = lazy(() =>
   }))
 )
 
-export function DashboardPage() {
+export function OverviewPage() {
   const grid = useGrid()
-  const { now, periods } = grid
+  const { now, periods, period } = grid
+  const prev = periods[(period + 47) % 48]
 
   const generation = now.outputs.reduce((s, o) => s + o.mw, 0)
   const headroom = now.outputs.reduce((s, o) => s + (o.available - o.mw), 0)
-  const dayEnergy = energy(periods, served)
+  const prevHeadroom = prev.outputs.reduce(
+    (s, o) => s + (o.available - o.mw),
+    0
+  )
   const shortfall = periods.filter((p) => p.unserved > 0.5)
-  const dayCarbon =
-    periods.reduce((s, p) => s + p.carbonIntensity * served(p) * 0.5, 0) /
-    dayEnergy
+  const basis = `vs ${periodLabel(prev.period)}`
 
   const placeholder = (
     <div className="absolute inset-0 px-4 pt-24 sm:px-6">
@@ -41,22 +41,17 @@ export function DashboardPage() {
   )
 
   return (
-    <main className="mx-auto w-full max-w-[120rem] px-4 pb-12 sm:px-6">
-      {/*
-        The region first, as a place, with the instruments laid over its foot. The scene is
-        the thing the rest of the page is reading; a visitor should meet it before the charts.
-      */}
-      <section className="relative -mx-4 sm:-mx-6">
-        <div className="relative flex h-[62svh] min-h-[30rem] flex-col lg:block lg:h-[66svh] lg:min-h-[36rem]">
-          {/* On a phone the title sits above the scene in flow; on a wide screen it floats over it. */}
-          <div className="pointer-events-none px-4 pt-5 sm:px-6 lg:absolute lg:inset-x-6 lg:top-5 lg:z-10 lg:px-0 lg:pt-0">
+    <div className="flex flex-col gap-3 p-3 sm:p-4">
+      {/* The region first, as a place, with the instruments laid over its foot. */}
+      <section className="relative">
+        <div className="relative flex h-[56svh] min-h-[28rem] flex-col overflow-hidden rounded-xl lg:block lg:h-[60svh] lg:min-h-[34rem]">
+          <div className="pointer-events-none px-4 pt-4 sm:px-6 lg:absolute lg:inset-x-6 lg:top-5 lg:z-10 lg:px-0 lg:pt-0">
             <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
-              Dispatch
+              Overview
             </h1>
             <p className="mt-1 max-w-md text-sm text-muted-foreground">
-              A fictional region, solved half-hourly. Generation equals demand
-              in every period — drag to look around, press a plant to take it
-              out.
+              A fictional region, solved half-hourly. Drag to look around, press
+              a plant to take it out.
             </p>
             <p className="mt-2 label">
               Settlement period {String(now.period + 1).padStart(2, "0")} of 48
@@ -70,51 +65,68 @@ export function DashboardPage() {
           </div>
         </div>
 
-        {/* The instruments, riding up over the foot of the scene on a wide screen. */}
-        <div className="relative z-10 grid grid-cols-2 gap-3 px-4 pt-3 sm:px-6 lg:-mt-28 lg:grid-cols-[21rem_repeat(4,minmax(0,1fr))_17rem] lg:pt-0">
-          <StatTile
+        <div className="relative z-10 grid grid-cols-2 gap-3 pt-3 lg:-mt-24 lg:grid-cols-[20rem_repeat(4,minmax(0,1fr))_16rem] lg:px-4 lg:pt-0">
+          <KpiCard
             hero
-            label="Carbon intensity, now"
+            label="Carbon intensity"
             value={now.carbonIntensity}
+            previous={prev.carbonIntensity}
             unit="gCO₂/kWh"
-            note={`${Math.round(dayCarbon)} across the day · ${now.marginalUnit} is setting the price`}
+            goodWhen="down"
+            insight={`${now.marginalUnit === "export" ? "Exporting" : now.marginalUnit} is setting the price`}
+            basis={basis}
             className="col-span-2 lg:col-span-1"
           />
-          <StatTile
+          <KpiCard
             label="Demand"
             value={now.demand / 1000}
+            previous={prev.demand / 1000}
             decimals={2}
             unit="GW"
+            goodWhen="none"
+            insight={`${Math.round(generation).toLocaleString("en-GB")} MW generating`}
+            basis={basis}
           />
-          <StatTile
+          <KpiCard
             label="Price"
             value={now.price}
+            previous={prev.price}
             prefix="£"
             unit="/MWh"
-            note={now.marginalUnit}
+            goodWhen="down"
+            insight={
+              now.marginalUnit === "export"
+                ? "Export price"
+                : `Set by ${now.marginalUnit}`
+            }
+            basis={basis}
           />
-          <StatTile
+          <KpiCard
             label="Interconnector"
             value={Math.abs(now.interconnector)}
+            previous={Math.abs(prev.interconnector)}
             prefix={now.interconnector >= 0 ? "+" : "−"}
             unit="MW"
-            note={now.interconnector >= 0 ? "importing" : "exporting"}
+            goodWhen="none"
+            insight={now.interconnector >= 0 ? "Importing" : "Exporting"}
+            basis={basis}
           />
-          <StatTile
+          <KpiCard
             label="Spare capacity"
             value={headroom}
+            previous={prevHeadroom}
             unit="MW"
-            note={`${Math.round(generation).toLocaleString("en-GB")} MW generating`}
+            goodWhen="up"
             tone={headroom < 500 ? "warning" : "normal"}
+            insight={
+              headroom < 500 ? "Reserve below 500 MW" : "Reserve healthy"
+            }
+            basis={basis}
           />
           <ScenarioPanel className="glass col-span-2 lg:col-span-1" />
         </div>
       </section>
 
-      {/*
-        The one condition the whole thing exists to avoid, said in words. Everything else on
-        this page is a reading; this is a verdict.
-      */}
       <AnimatePresence initial={false}>
         {shortfall.length > 0 ? (
           <motion.p
@@ -124,7 +136,7 @@ export function DashboardPage() {
             animate={{ opacity: 1, y: 0, height: "auto" }}
             exit={{ opacity: 0, y: -8, height: 0 }}
             transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-            className="mt-3 overflow-hidden rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+            className="overflow-hidden rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive"
           >
             <strong className="font-semibold">Demand not met.</strong>{" "}
             {shortfall.length} of 48 periods are short, the worst by{" "}
@@ -136,33 +148,24 @@ export function DashboardPage() {
               shortfall.reduce((a, b) => (b.unserved > a.unserved ? b : a))
                 .period
             )}
-            .
+            .{" "}
+            <Link to="/fleet" className="underline underline-offset-2">
+              See the fleet
+            </Link>
           </motion.p>
         ) : null}
       </AnimatePresence>
 
-      <section className="mt-3">
-        <DispatchChart
-          periods={periods}
-          period={grid.period}
-          onSelect={grid.setPeriod}
-        />
-      </section>
+      <DispatchChart
+        periods={periods}
+        period={period}
+        onSelect={grid.setPeriod}
+      />
 
-      <section className="mt-3">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]">
         <Schematic now={now} offline={grid.offline} onToggle={grid.toggle} />
-      </section>
-
-      <section className="mt-3 grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(0,34rem)]">
-        <UnitTable
-          units={grid.units}
-          now={now}
-          offline={grid.offline}
-          onToggle={grid.toggle}
-          onRestore={grid.restore}
-        />
-        <MeritCurve now={now} />
-      </section>
-    </main>
+        <EventsFeed />
+      </div>
+    </div>
   )
 }

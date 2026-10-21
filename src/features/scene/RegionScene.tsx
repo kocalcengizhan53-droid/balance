@@ -1,9 +1,8 @@
-import { useEffect, useMemo, useRef } from "react"
+import { useEffect, useMemo, useRef, type ReactNode } from "react"
 import { Canvas, useFrame, useThree } from "@react-three/fiber"
 import {
   Environment,
   Grid,
-  Html,
   Lightformer,
   Line,
   OrbitControls,
@@ -400,9 +399,6 @@ function Plant({
       )
   }
 
-  const height =
-    unit.fuel === "wind" ? s * 2.2 + 1.3 : unit.fuel === "solar" ? 0.9 : s * 1.9
-
   return (
     <group position={p}>
       <group onClick={(e) => (e.stopPropagation(), onToggle())}>
@@ -418,30 +414,6 @@ function Plant({
           />
         </mesh>
       </group>
-      <Html
-        position={[0, height + 0.35, 0]}
-        center
-        zIndexRange={[20, 0]}
-        style={{ pointerEvents: "auto" }}
-      >
-        <button
-          type="button"
-          onClick={onToggle}
-          aria-pressed={offline}
-          aria-label={`${unit.name}, ${Math.round(out.mw)} of ${unit.capacity} megawatts${offline ? ", offline" : ""}`}
-          className="glass hidden items-baseline gap-1.5 rounded-full px-2.5 py-1 figure text-[11px] leading-none whitespace-nowrap text-foreground select-none hover:border-ring/60 focus-visible:outline-2 focus-visible:outline-ring sm:flex"
-        >
-          <span
-            aria-hidden="true"
-            className="inline-block size-1.5 rounded-full"
-            style={{ backgroundColor: colour, opacity: offline ? 0.3 : 1 }}
-          />
-          <span className={offline ? "line-through opacity-60" : ""}>
-            {unit.name}
-          </span>
-          <span className="text-muted-foreground">{Math.round(out.mw)}</span>
-        </button>
-      </Html>
     </group>
   )
 }
@@ -476,24 +448,11 @@ function Node({
         <cylinderGeometry args={[0.05, 0.05, 1.4, 8]} />
         <meshStandardMaterial color={theme.node} roughness={0.4} />
       </mesh>
-      <Html position={[0, 1.75, 0]} center zIndexRange={[10, 0]}>
-        <span className="pointer-events-none label whitespace-nowrap text-foreground/90">
-          {NODES[id].name} · {Math.round(mw).toLocaleString("en-GB")}
-        </span>
-      </Html>
     </group>
   )
 }
 
-function Pylon({
-  theme,
-  importing,
-  mw,
-}: {
-  theme: SceneTheme
-  importing: boolean
-  mw: number
-}) {
+function Pylon({ theme }: { theme: SceneTheme }) {
   const p = at(LINK_AT)
   return (
     <group position={p}>
@@ -505,12 +464,6 @@ function Pylon({
         <boxGeometry args={[1.6, 0.06, 0.06]} />
         <meshStandardMaterial color={theme.node} />
       </mesh>
-      <Html position={[0, 3, 0]} center zIndexRange={[10, 0]}>
-        <span className="pointer-events-none label whitespace-nowrap text-foreground/90">
-          {INTERCONNECTOR.name} · {importing ? "↓" : "↑"}{" "}
-          {Math.round(mw).toLocaleString("en-GB")}
-        </span>
-      </Html>
     </group>
   )
 }
@@ -685,9 +638,85 @@ function Flows({ flows, theme }: { flows: Flow[]; theme: SceneTheme }) {
   )
 }
 
+/* ---------- Labels ---------------------------------------------------------------------- */
+
+/**
+ * Labels are ordinary DOM, drawn beside the canvas and moved by a projector each frame. drei's
+ * Html component does the same job with a React root per label in a portal, and on React 19
+ * that root tears down a node the parent has already removed when the page is left — a
+ * `removeChild` error on every navigation away from the overview. Nothing here is portalled,
+ * so nothing is removed twice.
+ */
+type LabelSpec = { id: string; at: [number, number, number]; node: ReactNode }
+type LabelRefs = React.RefObject<
+  Map<string, { at: THREE.Vector3; el: HTMLElement | null }>
+>
+
+/** Where a plant's label hangs: above whatever the plant's body is. */
+function labelHeight(unit: Unit) {
+  const s = sizeOf(unit)
+  return (
+    (unit.fuel === "wind"
+      ? s * 2.2 + 1.3
+      : unit.fuel === "solar"
+        ? 0.9
+        : s * 1.9) + 0.35
+  )
+}
+
+function Projector({ refs }: { refs: LabelRefs }) {
+  const v = useMemo(() => new THREE.Vector3(), [])
+  useFrame(({ camera, size }) => {
+    for (const { at, el } of refs.current.values()) {
+      if (!el) continue
+      v.copy(at).project(camera)
+      const x = ((v.x + 1) / 2) * size.width
+      const y = ((1 - v.y) / 2) * size.height
+      const visible =
+        v.z < 1 &&
+        x > -80 &&
+        x < size.width + 80 &&
+        y > -40 &&
+        y < size.height + 40
+      el.style.transform = `translate3d(${x.toFixed(1)}px, ${y.toFixed(1)}px, 0) translate(-50%, -100%)`
+      el.style.opacity = visible ? "1" : "0"
+      el.style.pointerEvents = visible ? "" : "none"
+    }
+  })
+  return null
+}
+
+function SceneLabels({
+  labels,
+  refs,
+}: {
+  labels: LabelSpec[]
+  refs: LabelRefs
+}) {
+  return (
+    <div className="pointer-events-none absolute inset-0 overflow-hidden">
+      {labels.map((label) => (
+        <div
+          key={label.id}
+          ref={(el) => {
+            refs.current.set(label.id, {
+              at: new THREE.Vector3(...label.at),
+              el,
+            })
+          }}
+          className="absolute top-0 left-0 will-change-transform"
+          style={{ opacity: 0 }}
+        >
+          {label.node}
+        </div>
+      ))}
+    </div>
+  )
+}
+
 /* ---------- Scene --------------------------------------------------------------------- */
 
-function Region() {
+function Region({ labelRefs }: { labelRefs: LabelRefs }) {
   const { now, offline, toggle, period, periods } = useGrid()
   const theme = useSceneTheme()
   const fuelHex = useFuelHex()
@@ -742,12 +771,9 @@ function Region() {
         />
       ))}
 
-      <Pylon
-        theme={theme}
-        importing={now.interconnector >= 0}
-        mw={Math.abs(now.interconnector)}
-      />
+      <Pylon theme={theme} />
       <Flows flows={flows} theme={theme} />
+      <Projector refs={labelRefs} />
 
       <OrbitControls
         makeDefault
@@ -796,9 +822,71 @@ const HAS_WEBGL = (() => {
   }
 })()
 
-export function RegionScene({ fallback }: { fallback: React.ReactNode }) {
-  const { now } = useGrid()
+export function RegionScene({ fallback }: { fallback: ReactNode }) {
+  const { now, offline, toggle } = useGrid()
+  const fuelHex = useFuelHex()
+  const labelRefs = useRef(
+    new Map<string, { at: THREE.Vector3; el: HTMLElement | null }>()
+  )
   if (!HAS_WEBGL) return <>{fallback}</>
+
+  const nodeTotals = (Object.keys(NODES) as NodeId[]).map((id) => ({
+    id,
+    mw: now.outputs
+      .filter((o) => o.unit.node === id)
+      .reduce((s, o) => s + o.mw, 0),
+  }))
+  const importing = now.interconnector >= 0
+
+  const labels: LabelSpec[] = [
+    ...now.outputs.map((out) => {
+      const unit = out.unit
+      const isOff = offline.includes(unit.id)
+      const colour = fuelHex[unit.fuel as Series]
+      return {
+        id: `u-${unit.id}`,
+        at: lift(at(UNIT_AT[unit.id]), labelHeight(unit)),
+        node: (
+          <button
+            type="button"
+            onClick={() => toggle(unit.id)}
+            aria-pressed={isOff}
+            aria-label={`${unit.name}, ${Math.round(out.mw)} of ${unit.capacity} megawatts${isOff ? ", offline" : ""}`}
+            className="pointer-events-auto glass hidden items-baseline gap-1.5 rounded-full px-2.5 py-1 figure text-[11px] leading-none whitespace-nowrap text-foreground select-none hover:border-ring/60 focus-visible:outline-2 focus-visible:outline-ring sm:flex"
+          >
+            <span
+              aria-hidden="true"
+              className="inline-block size-1.5 rounded-full"
+              style={{ backgroundColor: colour, opacity: isOff ? 0.3 : 1 }}
+            />
+            <span className={isOff ? "line-through opacity-60" : ""}>
+              {unit.name}
+            </span>
+            <span className="text-muted-foreground">{Math.round(out.mw)}</span>
+          </button>
+        ),
+      }
+    }),
+    ...nodeTotals.map((n) => ({
+      id: `n-${n.id}`,
+      at: lift(at(NODE_AT[n.id]), 1.75),
+      node: (
+        <span className="label whitespace-nowrap text-foreground/90">
+          {NODES[n.id].name} · {Math.round(n.mw).toLocaleString("en-GB")}
+        </span>
+      ),
+    })),
+    {
+      id: "link",
+      at: lift(at(LINK_AT), 3),
+      node: (
+        <span className="label whitespace-nowrap text-foreground/90">
+          {INTERCONNECTOR.name} · {importing ? "↓" : "↑"}{" "}
+          {Math.abs(Math.round(now.interconnector)).toLocaleString("en-GB")}
+        </span>
+      ),
+    },
+  ]
 
   return (
     <div
@@ -818,8 +906,9 @@ export function RegionScene({ fallback }: { fallback: React.ReactNode }) {
         style={{ touchAction: "pan-y" }}
       >
         <CameraRig />
-        <Region />
+        <Region labelRefs={labelRefs} />
       </Canvas>
+      <SceneLabels labels={labels} refs={labelRefs} />
     </div>
   )
 }

@@ -37,7 +37,7 @@ for (const width of [390, 768, 1280, 1600]) {
     await page.setViewportSize({ width, height: 900 })
     await page.goto("/")
     await expect(
-      page.getByRole("heading", { name: "Dispatch", exact: true })
+      page.getByRole("heading", { name: "Overview", exact: true })
     ).toBeVisible()
 
     const overflow = await page.evaluate(
@@ -48,7 +48,7 @@ for (const width of [390, 768, 1280, 1600]) {
     expect(overflow, "the document itself scrolling sideways").toBe(0)
 
     const sizes = await smallestSvgText(page)
-    expect(Object.keys(sizes).length, "figures found").toBeGreaterThanOrEqual(3)
+    expect(Object.keys(sizes).length, "figures found").toBeGreaterThanOrEqual(2)
     for (const [name, px] of Object.entries(sizes)) {
       expect(px, `smallest text in "${name}"`).toBeGreaterThanOrEqual(9)
     }
@@ -70,15 +70,17 @@ test("every figure is drawn, and drawn again in the light theme", async ({
     has: page.getByText("Dispatch across the day"),
   })
   await expect(areas.locator("svg > path[fill^='var(--fuel']")).toHaveCount(8)
-  await expect(
-    page
-      .locator("figure", { has: page.getByText("Merit order") })
-      .locator("svg rect")
-  ).not.toHaveCount(0)
 
   // Dark is the default; the designed alternative is light, and it has to draw too.
   await page.getByRole("button", { name: /Switch to light theme/ }).click()
   await expect(page.locator("html")).not.toHaveClass(/dark/)
   await expect(areas.locator("svg > path[fill^='var(--fuel']")).toHaveCount(8)
   await page.screenshot({ path: "qa-output/light.png", fullPage: true })
+
+  await page.goto("/market")
+  await expect(
+    page
+      .locator("figure", { has: page.getByText("Merit order") })
+      .locator("svg rect")
+  ).not.toHaveCount(0)
 })

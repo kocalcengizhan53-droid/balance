@@ -1,5 +1,31 @@
 import { expect, test } from "./fixtures"
 
+/** The fleet table is paged and sorted by output, so a unit that was taken out is on the last page. */
+async function rowFor(page: import("@playwright/test").Page, name: string) {
+  const row = page.getByRole("row", { name: new RegExp(`\\b${name}\\b`) })
+  const prev = page.getByRole("button", { name: "Previous page" })
+  while (!(await prev.isDisabled())) await prev.click()
+  for (let i = 0; i < 3; i++) {
+    if ((await row.count()) > 0) return row
+    const next = page.getByRole("button", { name: "Next page" })
+    if (await next.isDisabled()) break
+    await next.click()
+  }
+  return row
+}
+
+/** Navigate the way a visitor does — by the rail — so the view's state comes along. */
+async function toPage(
+  page: import("@playwright/test").Page,
+  name: string,
+  mobile: boolean
+) {
+  if (mobile)
+    await page.getByRole("button", { name: /toggle sidebar/i }).click()
+  await page.getByRole("link", { name, exact: true }).first().click()
+  await page.getByRole("heading", { level: 1, name }).waitFor()
+}
+
 /** The single-line diagram: the one place a unit's control stands still. */
 const diagram = (page: import("@playwright/test").Page) =>
   page
@@ -15,7 +41,7 @@ const diagram = (page: import("@playwright/test").Page) =>
  */
 test("Tab from the top reaches the theme switch, the diagram and the fleet", async ({
   page,
-}) => {
+}, info) => {
   await page.goto("/")
   await page.locator("body").click({ position: { x: 2, y: 2 } })
 
@@ -52,9 +78,16 @@ test("Tab from the top reaches the theme switch, the diagram and the fleet", asy
     reached.some((r) => /^button Play the day/.test(r)),
     "the play control"
   ).toBe(true)
+  if (info.project.name !== "mobile")
+    expect(
+      reached.some((r) => /^a Fleet/.test(r)),
+      "the rail"
+    ).toBe(true)
   expect(
-    reached.some((r) => /^button Hartmoor ?Nuclear/.test(r)),
-    "a fleet row"
+    reached.some(
+      (r) => /^input/.test(r) && /Carbon|Demand|Wind|^input $/.test(r)
+    ) || reached.filter((r) => /^input/.test(r)).length >= 2,
+    "the levers"
   ).toBe(true)
 })
 
@@ -69,20 +102,20 @@ test("the plant's own label in the scene takes it offline too", async ({
   const pill = page.getByRole("button", { name: /^Hartmoor, \d/ }).first()
   await pill.click({ force: true })
   await expect(pill).toHaveAttribute("aria-pressed", "true")
-  await expect(page.getByRole("row", { name: /^Hartmoor\b/ })).toContainText(
-    "offline"
-  )
+  await toPage(page, "Fleet", info.project.name === "mobile")
+  await expect(await rowFor(page, "Hartmoor")).toContainText("offline")
 })
 
-test("Enter on a diagram row takes the unit offline", async ({ page }) => {
+test("Enter on a diagram row takes the unit offline", async ({
+  page,
+}, info) => {
   await page.goto("/")
   const row = diagram(page).getByRole("button", { name: /^Hartmoor, \d/ })
   await row.press("Enter")
 
   await expect(row).toHaveAttribute("aria-pressed", "true")
-  await expect(page.getByRole("row", { name: /^Hartmoor\b/ })).toContainText(
-    "offline"
-  )
+  await toPage(page, "Fleet", info.project.name === "mobile")
+  await expect(await rowFor(page, "Hartmoor")).toContainText("offline")
 })
 
 test("the arrow keys walk the day half-hour by half-hour", async ({ page }) => {

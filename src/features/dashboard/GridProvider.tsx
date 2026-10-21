@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react"
 
+import { readUrlState, writeUrlState } from "@/features/dashboard/url-state"
+
 import { publishGridState } from "@/devtools"
 import { GridContext, type Grid } from "@/features/dashboard/grid-context"
 import {
@@ -23,10 +25,12 @@ const TICK_MS = 720
  * instrument follows it because every instrument reads `now`.
  */
 export function GridProvider({ children }: { children: ReactNode }) {
-  const [offline, setOffline] = useState<readonly string[]>([])
-  const [period, setPeriodState] = useState(36) // 18:00 — the evening peak, where the day is hardest
+  // 18:00 by default — the evening peak, where the day is hardest — unless the URL says otherwise.
+  const [initial] = useState(() => readUrlState())
+  const [offline, setOffline] = useState<readonly string[]>(initial.offline)
+  const [period, setPeriodState] = useState(initial.period ?? 36)
   const [playing, setPlaying] = useState(false)
-  const [scenario, setScenarioState] = useState<Scenario>(BASELINE)
+  const [scenario, setScenarioState] = useState<Scenario>(initial.scenario)
 
   const solution = solve(offline, scenario)
 
@@ -39,10 +43,10 @@ export function GridProvider({ children }: { children: ReactNode }) {
     return () => window.clearInterval(id)
   }, [playing])
 
-  useEffect(
-    () => publishGridState(offline, period, scenario),
-    [offline, period, scenario]
-  )
+  useEffect(() => {
+    publishGridState(offline, period, scenario)
+    writeUrlState({ offline, period, scenario })
+  }, [offline, period, scenario])
 
   const toggle = useCallback((id: string) => {
     setOffline((current) =>

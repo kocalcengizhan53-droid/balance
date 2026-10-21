@@ -2,7 +2,14 @@ import { useId, useState } from "react"
 import { motion } from "motion/react"
 
 import { useElementWidth } from "@/components/use-element-width"
-
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { FUEL_LABEL, FUEL_ORDER, fuelVar, type Series } from "@/lib/viz/fuel"
 import type { Period } from "@/lib/grid/dispatch"
 import { PERIODS, periodLabel } from "@/lib/grid/profiles"
@@ -15,56 +22,26 @@ import { PERIODS, periodLabel } from "@/lib/grid/profiles"
  * exporting, and where it falls short the link is importing — which is the only way to see at
  * a glance that the two are not the same thing.
  *
- * Drawn as polygons from the solved periods rather than by a chart library, so the geometry
- * comes from the same numbers as the tiles and cannot disagree with them.
+ * A range control narrows the window the way every product chart does — the whole day, the
+ * morning rise, the evening peak, the night — and a readout follows the pointer. Drawn as
+ * polygons from the solved periods rather than by a chart library, so the geometry comes from
+ * the same numbers as the tiles and cannot disagree with them.
  */
 
 const PAD = { top: 12, right: 8, bottom: 22, left: 44 }
-
-/*
- * A change in the solution is drawn as a change: the bands slide to their new shape rather
- * than cutting to it, so a reader who trips a unit sees which fuels moved to cover it. The
- * paths always carry the same number of points, which is what lets the `d` string tween.
- */
+const GAP = 2
 const EASE = { duration: 0.6, ease: [0.16, 1, 0.3, 1] } as const
 const FOLLOW = { duration: 0.22, ease: "easeOut" } as const
 
-/** 2px of surface between bands, in user units, so neighbours read apart without a stroke. */
-const GAP = 2
+const RANGES = {
+  day: { label: "Full day", from: 0, to: 47 },
+  morning: { label: "Morning", from: 10, to: 24 },
+  peak: { label: "Evening peak", from: 30, to: 44 },
+  night: { label: "Night", from: 40, to: 47 },
+} as const
+type RangeKey = keyof typeof RANGES
 
 type Stack = { series: Series; points: { x: number; y0: number; y1: number }[] }
-
-function buildStacks(
-  periods: readonly Period[],
-  x: (i: number) => number,
-  y: (mw: number) => number
-) {
-  const running = new Array(periods.length).fill(0)
-  return FUEL_ORDER.map((series) => {
-    const points = periods.map((p, i) => {
-      const mw =
-        series === "import"
-          ? Math.max(0, p.interconnector)
-          : p.outputs
-              .filter((o) => o.unit.fuel === series)
-              .reduce((sum, o) => sum + o.mw, 0)
-      const y0 = running[i]
-      running[i] = y0 + mw
-      return { x: x(i), y0: y(y0), y1: y(running[i]) }
-    })
-    return { series, points } satisfies Stack
-  })
-}
-
-const area = (points: Stack["points"]) => {
-  const top = points.map(
-    (p) => `${p.x.toFixed(1)},${(p.y1 + GAP / 2).toFixed(1)}`
-  )
-  const bottom = [...points]
-    .reverse()
-    .map((p) => `${p.x.toFixed(1)},${p.y0.toFixed(1)}`)
-  return `M${top.join("L")}L${bottom.join("L")}Z`
-}
 
 export function DispatchChart({
   periods,
@@ -78,13 +55,18 @@ export function DispatchChart({
   const id = useId()
   const [box, measured] = useElementWidth(1000)
   const [hover, setHover] = useState<number | null>(null)
+  const [pointer, setPointer] = useState<{ x: number; y: number } | null>(null)
+  const [rangeKey, setRangeKey] = useState<RangeKey>("day")
+  const range = RANGES[rangeKey]
   const active = hover ?? period
 
   const W = Math.max(320, measured)
-  // Proportional, so the day keeps its shape on a wide screen and stays tall enough on a phone.
   const H = Math.round(Math.min(400, Math.max(210, W * 0.26)))
   const PLOT = { w: W - PAD.left - PAD.right, h: H - PAD.top - PAD.bottom }
 
+  const shown = periods.filter(
+    (p) => p.period >= range.from && p.period <= range.to
+  )
   const peak = Math.max(
     ...periods.map(
       (p) =>
@@ -93,60 +75,136 @@ export function DispatchChart({
     ...periods.map((p) => p.demand)
   )
   const max = Math.ceil(peak / 1000) * 1000
-  const x = (i: number) => PAD.left + (i / (PERIODS - 1)) * PLOT.w
+  const span = Math.max(1, range.to - range.from)
+  const x = (i: number) => PAD.left + ((i - range.from) / span) * PLOT.w
   const y = (mw: number) => PAD.top + PLOT.h - (mw / max) * PLOT.h
 
-  const stacks = buildStacks(periods, x, y)
-  const demandLine = periods
-    .map((p, i) => `${x(i).toFixed(1)},${y(p.demand).toFixed(1)}`)
+  const running = new Map<number, number>()
+  const stacks: Stack[] = FUEL_ORDER.map((series) => ({
+    series,
+    points: shown.map((p) => {
+      const mw =
+        series === "import"
+          ? Math.max(0, p.interconnector)
+          : p.outputs
+              .filter((o) => o.unit.fuel === series)
+              .reduce((s, o) => s + o.mw, 0)
+      const y0 = running.get(p.period) ?? 0
+      running.set(p.period, y0 + mw)
+      return { x: x(p.period), y0: y(y0), y1: y(y0 + mw) }
+    }),
+  }))
+  const area = (points: Stack["points"]) => {
+    const top = points.map(
+      (p) => `${p.x.toFixed(1)},${(p.y1 + GAP / 2).toFixed(1)}`
+    )
+    const bottom = [...points]
+      .reverse()
+      .map((p) => `${p.x.toFixed(1)},${p.y0.toFixed(1)}`)
+    return `M${top.join("L")}L${bottom.join("L")}Z`
+  }
+  const demandLine = shown
+    .map((p) => `${x(p.period).toFixed(1)},${y(p.demand).toFixed(1)}`)
     .join("L")
-
-  const hasShortfall = periods.some((p) => p.unserved > 0.5)
   const servedTop = (p: Period) =>
     p.outputs.reduce((s, o) => s + o.mw, 0) + Math.max(0, p.interconnector)
-  const shortfallArea = `M${periods.map((p, i) => `${x(i).toFixed(1)},${y(p.demand).toFixed(1)}`).join("L")}L${[
-    ...periods,
+  const hasShortfall = shown.some((p) => p.unserved > 0.5)
+  const shortfallArea = `M${shown.map((p) => `${x(p.period).toFixed(1)},${y(p.demand).toFixed(1)}`).join("L")}L${[
+    ...shown,
   ]
-    .map((p, i) => ({ p, i }))
     .reverse()
     .map(
-      ({ p, i }) =>
-        `${x(i).toFixed(1)},${y(Math.min(p.demand, servedTop(p))).toFixed(1)}`
+      (p) =>
+        `${x(p.period).toFixed(1)},${y(Math.min(p.demand, servedTop(p))).toFixed(1)}`
     )
     .join("L")}Z`
   const ticks = Array.from({ length: max / 2000 + 1 }, (_, i) => i * 2000)
+  const labels = [0, 0.25, 0.5, 0.75, 1].map((t) =>
+    Math.round(range.from + t * span)
+  )
   const now = periods[active]
+  const inRange = active >= range.from && active <= range.to
 
-  const fromClientX = (clientX: number, box: DOMRect) => {
-    const ratio = (clientX - box.left) / box.width
-    return Math.round(
-      Math.max(0, Math.min(1, (ratio * W - PAD.left) / PLOT.w)) * (PERIODS - 1)
+  const fromClientX = (clientX: number, rect: DOMRect) =>
+    Math.round(
+      range.from +
+        Math.max(
+          0,
+          Math.min(
+            1,
+            (((clientX - rect.left) / rect.width) * W - PAD.left) / PLOT.w
+          )
+        ) *
+          span
     )
-  }
 
   return (
     <figure className="panel">
-      <figcaption className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1 border-b border-border/60 px-4 py-3">
-        <h2 className="text-sm font-semibold tracking-tight">
-          Dispatch across the day
-        </h2>
-        <p className="text-xs text-muted-foreground">
-          Megawatts by fuel, half-hourly. The line is demand.
-        </p>
+      <figcaption className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 border-b border-border/60 px-4 py-3">
+        <div>
+          <h2 className="text-sm font-semibold tracking-tight">
+            Dispatch across the day
+          </h2>
+          <p className="text-xs text-muted-foreground">
+            Megawatts by fuel, half-hourly. The line is demand.
+          </p>
+        </div>
+        <ToggleGroup
+          value={[rangeKey]}
+          onValueChange={(v) => {
+            const k = (v as RangeKey[])[0]
+            if (k) setRangeKey(k)
+          }}
+          variant="outline"
+          size="sm"
+          className="hidden md:flex"
+          aria-label="Range"
+        >
+          {(Object.keys(RANGES) as RangeKey[]).map((k) => (
+            <ToggleGroupItem key={k} value={k} className="px-3 text-xs">
+              {RANGES[k].label}
+            </ToggleGroupItem>
+          ))}
+        </ToggleGroup>
+        <Select
+          value={rangeKey}
+          onValueChange={(v) => setRangeKey((v as RangeKey) ?? "day")}
+          items={Object.fromEntries(
+            (Object.keys(RANGES) as RangeKey[]).map((k) => [k, RANGES[k].label])
+          )}
+        >
+          <SelectTrigger
+            size="sm"
+            className="w-36 md:hidden"
+            aria-label="Range"
+          >
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {(Object.keys(RANGES) as RangeKey[]).map((k) => (
+              <SelectItem key={k} value={k}>
+                {RANGES[k].label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </figcaption>
 
-      <div className="px-2 pt-2" ref={box}>
+      <div className="relative px-2 pt-2" ref={box}>
         <svg
           viewBox={`0 0 ${W} ${H}`}
           className="block w-full touch-none"
           role="img"
-          aria-label={`Dispatch by fuel across the day. At ${periodLabel(active)}, demand is ${now.demand} megawatts.`}
-          onPointerMove={(e) =>
-            setHover(
-              fromClientX(e.clientX, e.currentTarget.getBoundingClientRect())
-            )
-          }
-          onPointerLeave={() => setHover(null)}
+          aria-label={`Dispatch by fuel, ${range.label.toLowerCase()}. At ${periodLabel(active)}, demand is ${now.demand} megawatts.`}
+          onPointerMove={(e) => {
+            const rect = e.currentTarget.getBoundingClientRect()
+            setHover(fromClientX(e.clientX, rect))
+            setPointer({ x: e.clientX - rect.left, y: e.clientY - rect.top })
+          }}
+          onPointerLeave={() => {
+            setHover(null)
+            setPointer(null)
+          }}
           onPointerDown={(e) =>
             onSelect(
               fromClientX(e.clientX, e.currentTarget.getBoundingClientRect())
@@ -174,7 +232,6 @@ export function DispatchChart({
               </text>
             </g>
           ))}
-          {/* Over the plot, not on the axis: at the axis it printed on top of the top tick. */}
           <text
             x={PAD.left + 4}
             y={PAD.top + 10}
@@ -185,7 +242,7 @@ export function DispatchChart({
 
           {stacks.map((stack) => (
             <motion.path
-              key={stack.series}
+              key={`${stack.series}-${rangeKey}`}
               initial={false}
               animate={{ d: area(stack.points) }}
               transition={EASE}
@@ -193,14 +250,6 @@ export function DispatchChart({
             />
           ))}
 
-          {/*
-            The gap between what the system produced and what was asked of it.
-            
-            With two gas stations out the stack falls a gigawatt below the demand line for
-            most of the day, and until this band was drawn the chart showed that failure as
-            an absence — the one thing a control room is watching for, rendered as nothing.
-            Hatched rather than filled so it reads as missing rather than as another fuel.
-          */}
           {hasShortfall ? (
             <>
               <pattern
@@ -220,6 +269,7 @@ export function DispatchChart({
                 />
               </pattern>
               <motion.path
+                key={`short-${rangeKey}`}
                 initial={false}
                 animate={{ d: shortfallArea }}
                 transition={EASE}
@@ -230,6 +280,7 @@ export function DispatchChart({
           ) : null}
 
           <motion.path
+            key={`demand-${rangeKey}`}
             initial={false}
             animate={{ d: `M${demandLine}` }}
             transition={EASE}
@@ -240,39 +291,85 @@ export function DispatchChart({
             strokeLinecap="round"
           />
 
-          {/* The crosshair finds the X; the reader aims at a time, not at a two-pixel line. */}
-          <motion.line
-            initial={false}
-            animate={{ x1: x(active), x2: x(active) }}
-            transition={FOLLOW}
-            y1={PAD.top}
-            y2={PAD.top + PLOT.h}
-            className="stroke-foreground"
-            strokeWidth={1}
-            strokeDasharray="3 3"
-          />
+          {inRange ? (
+            <motion.line
+              initial={false}
+              animate={{ x1: x(active), x2: x(active) }}
+              transition={FOLLOW}
+              y1={PAD.top}
+              y2={PAD.top + PLOT.h}
+              className="stroke-foreground"
+              strokeWidth={1}
+              strokeDasharray="3 3"
+            />
+          ) : null}
 
-          {[0, 12, 24, 36, 47].map((p) => (
+          {labels.map((p) => (
             <text
               key={p}
               x={x(p)}
               y={H - 6}
-              textAnchor={p === 0 ? "start" : p === 47 ? "end" : "middle"}
+              textAnchor={
+                p === range.from ? "start" : p === range.to ? "end" : "middle"
+              }
               className="fill-muted-foreground text-[11px] tabular-nums"
             >
               {periodLabel(p)}
             </text>
           ))}
         </svg>
+
+        {/* The readout that follows the pointer: the half-hour, and what was on the system. */}
+        {pointer && hover !== null ? (
+          <div
+            className="pointer-events-none glass absolute z-10 w-44 px-3 py-2 text-xs"
+            style={{
+              left: Math.min(pointer.x + 14, W - 190),
+              top: Math.max(8, pointer.y - 12),
+            }}
+            role="status"
+          >
+            <p className="mb-1.5 flex items-baseline justify-between figure font-medium">
+              <span>{periodLabel(hover)}</span>
+              <span className="text-muted-foreground">
+                £{Math.round(periods[hover].price)}
+              </span>
+            </p>
+            {[...FUEL_ORDER].reverse().map((series) => {
+              const mw =
+                series === "import"
+                  ? Math.max(0, periods[hover].interconnector)
+                  : periods[hover].outputs
+                      .filter((o) => o.unit.fuel === series)
+                      .reduce((s, o) => s + o.mw, 0)
+              if (mw < 0.5) return null
+              return (
+                <p key={series} className="flex items-center gap-2">
+                  <span
+                    className="size-2 rounded-[2px]"
+                    style={{ backgroundColor: fuelVar(series) }}
+                    aria-hidden="true"
+                  />
+                  <span className="text-muted-foreground">
+                    {FUEL_LABEL[series]}
+                  </span>
+                  <span className="ml-auto figure">
+                    {Math.round(mw).toLocaleString("en-GB")}
+                  </span>
+                </p>
+              )
+            })}
+            <p className="mt-1.5 flex items-center gap-2 border-t border-border/60 pt-1.5">
+              <span className="h-0.5 w-2 bg-foreground" aria-hidden="true" />
+              <span className="text-muted-foreground">Demand</span>
+              <span className="ml-auto figure">
+                {periods[hover].demand.toLocaleString("en-GB")}
+              </span>
+            </p>
+          </div>
+        ) : null}
       </div>
 
-      {/*
-        One readout for every series at the selected time. The value leads and the name
-        follows: the reader already knows which fuel they are looking at and wants the number.
-        It is a list rather than a floating tooltip so the figures are reachable without a
-        pointer, which the colour palette requires — three of the eight hues sit under 3:1 on
-        the light surface and may not carry identity alone.
-      */}
       <div
         className="grid grid-cols-2 gap-x-6 gap-y-1.5 border-t border-border/60 px-4 py-3 sm:grid-cols-3 lg:grid-cols-5"
         aria-live="polite"
@@ -291,7 +388,7 @@ export function DispatchChart({
                 className="mt-0.5 size-2.5 shrink-0 rounded-[2px]"
                 style={{ backgroundColor: fuelVar(series) }}
               />
-              <span className="text-sm font-medium tabular-nums">
+              <span className="figure text-sm font-medium">
                 {Math.round(mw)}
               </span>
               <span className="truncate text-xs text-muted-foreground">
@@ -305,7 +402,7 @@ export function DispatchChart({
             aria-hidden="true"
             className="mt-0.5 h-0.5 w-2.5 shrink-0 bg-foreground"
           />
-          <span className="text-sm font-medium tabular-nums">{now.demand}</span>
+          <span className="figure text-sm font-medium">{now.demand}</span>
           <span className="text-xs text-muted-foreground">Demand</span>
         </div>
       </div>
@@ -324,7 +421,7 @@ export function DispatchChart({
           value={period}
           onChange={(e) => onSelect(Number(e.target.value))}
           aria-valuetext={periodLabel(period)}
-          className="h-1 w-full cursor-pointer accent-foreground"
+          className="h-1 w-full cursor-pointer accent-live"
         />
         <span className="shrink-0 figure text-sm font-medium">
           {periodLabel(period)}

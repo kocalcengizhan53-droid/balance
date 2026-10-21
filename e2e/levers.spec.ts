@@ -6,8 +6,8 @@ import { expect, test } from "./fixtures"
 
 const figure = async (page: Page, name: string) =>
   Number(
-    (await page.locator(`[data-figure^="${name}"]`).innerText())
-      .match(/\d[\d,]*/)?.[0]
+    (await page.locator(`[data-figure^="${name}"] .lit`).innerText())
+      .match(/\d[\d,.]*/)?.[0]
       ?.replace(/,/g, "")
   )
 
@@ -62,6 +62,6 @@ test("a still day pulls more through the link", async ({ page }) => {
     .poll(() => figure(page, "Interconnector"), { timeout: 3000 })
     .toBeGreaterThanOrEqual(before)
   await expect(page.locator('[data-figure^="Interconnector"]')).toContainText(
-    "importing"
+    /importing/i
   )
 })
