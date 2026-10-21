@@ -17,6 +17,17 @@ export default defineConfig({
     baseURL: process.env.QA_BASE_URL ?? `http://localhost:${PORT}`,
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
+    /*
+     * A CI runner has no GPU. Chrome then draws the WebGL scene in software, and a 3D region
+     * with shadows and seven hundred particles at the display rate takes the whole CPU with
+     * it — every click waited thirty seconds and timed out. With WebGL off the page shows the
+     * single-line diagram in the scene's place, which is the product's own fallback, and the
+     * suite drives everything else as a visitor would. The scene's own checks run locally,
+     * where there is a GPU.
+     */
+    launchOptions: process.env.CI
+      ? { args: ["--disable-webgl", "--disable-webgl2", "--disable-gpu"] }
+      : undefined,
   },
 
   // The acceptance run drives the production bundle. Set QA_BASE_URL to point at a server
