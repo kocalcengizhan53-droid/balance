@@ -56,10 +56,24 @@ const usePhone = () =>
 /*
  * Whether the browser has WebGL at all — the API, not a context. Creating a context just to ask
  * costs tens of milliseconds on a phone (far more without a GPU) and the phone does not need the
- * answer until it is asked to draw. If the live scene then fails to start, the boundary below
- * catches it and the picture stays.
+ * answer until it is asked to draw; `canDraw` below asks then. Should the scene still fail, the
+ * boundary catches it and the picture stays.
  */
 const HAS_WEBGL = typeof WebGLRenderingContext !== "undefined"
+
+/*
+ * The API can exist while no context can be made (a GPU blocklist, a browser started with WebGL
+ * off, as on a CI runner). So a real context is tried once, at the moment the live scene would
+ * start — after load, not during it — and if there is none the picture simply stays.
+ */
+function canDraw() {
+  try {
+    const canvas = document.createElement("canvas")
+    return Boolean(canvas.getContext("webgl2") ?? canvas.getContext("webgl"))
+  } catch {
+    return false
+  }
+}
 
 /** Linear blend of two #rrggbb colours. */
 function mix(a: string, b: string, t: number) {
@@ -80,17 +94,19 @@ export function SceneStage({ fallback }: { fallback: ReactNode }) {
   const [live, setLive] = useState(false)
   const [ready, setReady] = useState(false)
   const [posterOk, setPosterOk] = useState(true)
+  const [noContext, setNoContext] = useState(false)
+  const goLive = () => (canDraw() ? setLive(true) : setNoContext(true))
 
   useEffect(() => {
-    if (!HAS_WEBGL || phone || live) return
+    if (!HAS_WEBGL || noContext || phone || live) return
     // Safari has no requestIdleCallback; a short timeout after load stands in for it.
-    const start = () => setLive(true)
+    const start = () => (canDraw() ? setLive(true) : setNoContext(true))
     const idle = typeof requestIdleCallback === "function"
     const id = idle
       ? requestIdleCallback(start, { timeout: 1800 })
       : setTimeout(start, 600)
     return () => (idle ? cancelIdleCallback(id as number) : clearTimeout(id))
-  }, [phone, live])
+  }, [phone, live, noContext])
 
   if (!HAS_WEBGL && !posterOk) return <>{fallback}</>
 
@@ -129,10 +145,10 @@ export function SceneStage({ fallback }: { fallback: ReactNode }) {
           </SceneBoundary>
         </div>
       ) : null}
-      {!live && HAS_WEBGL && phone ? (
+      {!live && HAS_WEBGL && !noContext && phone ? (
         <button
           type="button"
-          onClick={() => setLive(true)}
+          onClick={goLive}
           className="glass absolute right-4 bottom-4 z-10 inline-flex min-h-11 items-center gap-2 rounded-full px-4 text-sm font-medium text-foreground"
         >
           <Box className="size-4" aria-hidden="true" />
