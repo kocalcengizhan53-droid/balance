@@ -37,9 +37,10 @@ const PRESETS: { name: string; note: string; scenario: Scenario }[] = [
  */
 export function ScenariosPage() {
   const grid = useGrid()
-  const { periods, period, offline, scenario, setScenario } = grid
-  const here = dayStats({ periods, offline, scenario })
-  const base = dayStats(solve(offline, BASELINE))
+  const { periods, period, offline, scenario, setScenario, units } = grid
+  const here = dayStats({ periods, offline, scenario, fleet: units })
+  // The baseline keeps any operator's edits: only the levers differ between the two solves.
+  const base = dayStats(solve(offline, BASELINE, units))
   const same = (a: Scenario, b: Scenario) =>
     a.carbonPrice === b.carbonPrice &&
     a.demandScale === b.demandScale &&

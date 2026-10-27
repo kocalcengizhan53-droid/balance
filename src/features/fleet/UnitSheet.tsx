@@ -12,6 +12,7 @@ import { unitSeries, unitStatus } from "@/lib/grid/analysis"
 import { costWithCarbon } from "@/lib/grid/dispatch"
 import { periodLabel } from "@/lib/grid/profiles"
 import { FUEL_LABEL, fuelVar, type Series } from "@/lib/viz/fuel"
+import { UnitEditor } from "@/features/fleet/UnitEditor"
 
 /** A sparkline: the unit's day, 48 bars, the selected half-hour lit. */
 function Sparkline({
@@ -139,6 +140,9 @@ export function UnitSheet({
                 </div>
               ))}
             </dl>
+
+            {/* A fresh form per unit; after a save its fields already hold the new figures. */}
+            <UnitEditor key={unit.id} unit={unit} />
 
             <label className="panel mt-auto flex items-center justify-between gap-4 px-4 py-3">
               <span>

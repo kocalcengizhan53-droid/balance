@@ -10,7 +10,8 @@ A grid control room for a region that does not exist, solved half-hourly: an iso
 
 - **Press a plant to take it out** and watch the power re-route: the cables dim and brighten, the link across the strait picks up, the price and the carbon move — on every page at once.
 - **Pull three levers** (carbon price, demand, wind) or press a preset, and every figure is re-solved against the baseline. The state lives in the URL, so a scenario is a link.
-- **One model, proven in the browser:** a merit-order dispatch with minimum stable generation, ramp rates and unit commitment; the browser suite re-solves the day and compares it with the text actually painted. Lighthouse mobile **88–90** on all four pages, accessibility 100.
+- **Sign in as an operator** and re-declare a plant's capacity, minimum stable output or cost: the day re-solves on every page, the server checks the figures, and an audit log records who changed what. Viewers read and export any table as CSV. Each visitor gets a private sandbox for 24 hours.
+- **One model, proven in the browser:** a merit-order dispatch with minimum stable generation, ramp rates and unit commitment; the browser suite re-solves the day and compares it with the text actually painted. Lighthouse mobile **89–90** on all four pages, accessibility 100.
 
 ---
 
@@ -20,13 +21,26 @@ A grid control room for a region that does not exist, solved half-hourly: an iso
 | --- | --- | --- |
 | A data-dense dashboard reads as a spreadsheet | The region as an art-directed isometric model: plants sized by capacity and glowing with output, pulses along every cable at the solver's rate, the sun and the city's windows following the clock | The default view shows the data spatially, moving, with two levers in reach |
 | Three megabytes of WebGL made a phone wait | A poster rendered from the scene itself shows before the app's JavaScript loads; a desktop fades the live model in on idle, a phone loads it when asked | Overview mobile score **37 → 90**, blocking time **2.5 s → 30 ms** |
-| Every page shipped in one bundle | Fleet, market and scenarios load as routes; the command palette loads on first ⌘K | Fleet 88, market 89, scenarios 90 on mobile |
-| Four pages could disagree with each other | Nothing is typed into a component; one solver feeds all of them, and the browser checks the painted text against a fresh solve | 20 Vitest tests on the model, 48 Playwright checks on a desktop and a Pixel 7, axe 0 violations |
+| Every page shipped in one bundle | Each page loads as its own route, preloaded from the HTML when opened directly; the command palette loads on first ⌘K | Fleet 87 → 89, market 89 → 90 on mobile |
+| A dashboard with no login, no roles and nothing to change or download | A small API on the same Pages project (Functions + D1): sign in with a name and a role, a private 24-hour sandbox, operators re-declare units (validated again on the server, errors as RFC 9457), an audit log of every change and download, CSV export of the fleet, the settlement run and the log | 14 API tests against the real schema; the flow driven in the browser on a desktop and a phone; a visitor who never signs in makes **no API request** |
+| Four pages could disagree with each other | Nothing is typed into a component; one solver feeds all of them, and the browser checks the painted text against a fresh solve | 44 Vitest tests, 56 Playwright checks on a desktop and a Pixel 7, axe 0 violations — including with a unit re-declared |
 
 <p>
   <img src="docs/scenarios.webp" width="560" alt="Scenarios: a bad evening — calm, hot and priced — cost up 95%, imports up six-fold, thirteen half-hours short">
   <img src="docs/phone.webp" width="160" alt="The overview on a phone: the poster of the model with an Explore in 3D button">
 </p>
+
+## The control room as a product
+
+Sign in from the rail with a name and a role. **Viewers** read every page and export CSV; **operators** can also open any unit in the fleet and re-declare its capacity, minimum stable output and marginal cost. The edit is an input to the same solver as a unit taken offline, so the map, the KPIs, the market and the scenarios all re-read; the drawer refuses a minimum above the capacity before saving, and the server refuses it again with a problem response. The **audit log** lists every sign-in, role switch, re-declaration (with the figures before and after) and download.
+
+Behind it is [`server/api.ts`](server/api.ts), served by Pages Functions over D1: sessions in an HttpOnly cookie, 24-hour sandboxes deleted with everything in them, at most five sign-ins per address per ten minutes, state-changing requests accepted only as JSON. The browser asks the API who is signed in only when the cookie set at sign-in says someone might be, so a visitor who never signs in costs it nothing. The handlers are tested against the real migration over Node's built-in SQLite ([`server/api.test.ts`](server/api.test.ts)).
+
+| | |
+| --- | --- |
+| `GET`/`POST`/`PATCH`/`DELETE /api/session` | Who is signed in; sign in with a name and a role; switch role; sign out |
+| `GET /api/edits` · `PUT`/`DELETE /api/edits/{unit}` | The sandbox's re-declarations; operators only for changes |
+| `GET /api/audit` · `POST /api/audit/export` | The log, newest first; record a CSV download |
 
 ## The one rule
 
@@ -81,7 +95,7 @@ The fuel palette is checked rather than chosen: eight categorical hues validated
 
 ## The checks
 
-Twenty Vitest tests on the model, the readings derived from it and the scene layout. Forty-eight Playwright checks in [`e2e/`](e2e), run against the production bundle on a desktop and a Pixel 7 — including [`scene.spec.ts`](e2e/scene.spec.ts), which holds the poster on a phone until the visitor asks for the model.
+Forty-four Vitest tests: the model with and without re-declared units, the API's handlers against the real schema, the CSV writer and the scene layout. Fifty-six Playwright checks in [`e2e/`](e2e), run on a desktop and a Pixel 7 against the production bundle served with its API by `wrangler pages dev` over a local D1 — including [`session.spec.ts`](e2e/session.spec.ts), which signs in as an operator and as a viewer, and [`scene.spec.ts`](e2e/scene.spec.ts), which holds the poster on a phone until the visitor asks for the model. CI also runs an axe gate (WCAG 2.2 AA and best practice) and a Lighthouse gate (mobile, median of three runs) on every push.
 
 The load-bearing one is [`figures.spec.ts`](e2e/figures.spec.ts). The rule above is that no number is typed into a component, and a unit test cannot see that — it can only check the solver, and the solver was never what was at risk. So the browser re-solves the day from the view's own inputs and compares the result against the text actually painted — on the overview and row by row on the fleet page, at rest, after the period changes, and with two units offline.
 
@@ -102,14 +116,14 @@ npm run qa           # builds, serves the bundle, runs the browser checks
 npm run qa:dev       # the same checks against the dev server
 
 npm run posters      # re-render the scene posters from the live model
-npm run deploy       # builds and ships dist/ to Cloudflare Pages
+npm run deploy       # builds, applies D1 migrations, ships dist/ and functions/ to Cloudflare Pages
 ```
 
 `wrangler pages project create` now delegates to Cloudflare Workers, and on its way it rewrites `vite.config.ts` and `package.json` — the injected `cloudflare()` Vite plugin stops Vitest from starting. The project here was made with `--force`, which takes the classic Pages path; `npm run deploy` goes straight to it and changes nothing.
 
 ## Stack
 
-Vite 8 · React 19.3 with the React Compiler · TypeScript 6 · Tailwind CSS v4 · shadcn/ui on Base UI · React Router 8 · TanStack Table 8 · three 0.186 / React Three Fiber 9.8 / drei / postprocessing · Motion 14 · cmdk · Vitest 5 · Playwright · Cloudflare Pages.
+Vite 8 · React 19.3 with the React Compiler · TypeScript 6 · Tailwind CSS v4 · shadcn/ui on Base UI · React Router 8 · TanStack Table 8 · Cloudflare Pages Functions + D1 · three 0.186 / React Three Fiber 9.8 / drei / postprocessing · Motion 14 · cmdk · Vitest 5 · Playwright · Cloudflare Pages.
 
 No charting library: every mark is an SVG path built from the solved periods, so the geometry and the figures cannot come from different places.
 

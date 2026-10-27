@@ -16,6 +16,7 @@ export default defineConfig({
       "/fleet": "src/features/fleet/FleetPage.tsx",
       "/market": "src/features/market/MarketPage.tsx",
       "/scenarios": "src/features/scenarios/ScenariosPage.tsx",
+      "/audit": "src/features/audit/AuditPage.tsx",
     }),
   ],
   resolve: {
@@ -37,6 +38,14 @@ export default defineConfig({
           name: "unit",
           environment: "node",
           include: ["src/**/*.test.ts"],
+        },
+      },
+      {
+        // The API's handlers against the real schema, over Node's built-in SQLite.
+        test: {
+          name: "server",
+          environment: "node",
+          include: ["server/**/*.test.ts"],
         },
       },
       {

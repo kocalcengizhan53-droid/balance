@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/sidebar"
 import { useGrid } from "@/features/dashboard/useGrid"
 import { PAGES } from "@/features/layout/pages"
+import { SessionCard } from "@/features/session/SessionCard"
 import { BASELINE } from "@/lib/grid/dispatch"
 
 /**
@@ -110,6 +111,7 @@ export function AppSidebar() {
         </SidebarContent>
 
         <SidebarFooter>
+          <SessionCard />
           {/* The system, in one line, from the same solution as every page. */}
           <div className="panel mx-1 mb-1 px-3 py-2.5 group-data-[collapsible=icon]:hidden">
             <p className="flex items-center justify-between label">

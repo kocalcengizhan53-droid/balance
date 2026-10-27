@@ -32,6 +32,12 @@ export const router = createBrowserRouter([
             .ScenariosPage,
         }),
       },
+      {
+        path: "audit",
+        lazy: async () => ({
+          Component: (await import("@/features/audit/AuditPage")).AuditPage,
+        }),
+      },
       { path: "*", Component: NotFoundPage },
     ],
   },

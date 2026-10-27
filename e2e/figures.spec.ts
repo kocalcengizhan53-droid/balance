@@ -52,8 +52,9 @@ async function solved(page: Page) {
     const app = window.__app
     if (!app)
       throw new Error("window.__app missing — build without VITE_QA_HOOK?")
-    const { offline, period } = app.state
-    const p = app.solve(offline).periods[period]
+    const { offline, period, edits } = app.state
+    const p = app.solve(offline, undefined, app.applyEdits(app.units, edits))
+      .periods[period]
     return {
       period,
       demand: p.demand,
@@ -152,4 +153,25 @@ test("they still agree with two units offline", async ({ page }) => {
     .poll(() => page.evaluate(() => window.__app?.state.offline.length))
     .toBe(2)
   await expectAgreement(page)
+})
+
+test("they still agree with a unit re-declared by an operator", async ({
+  page,
+}, info) => {
+  // Through the API, as the drawer would: the page then loads the edit from the sandbox.
+  await page.request.post("/api/session", {
+    data: { name: "Figures", role: "operator" },
+  })
+  await page.request.put("/api/edits/calder-a", {
+    data: { capacity: 600, marginalCost: 95 },
+  })
+  await page.goto("/")
+  await expect
+    .poll(() =>
+      page.evaluate(() => window.__app?.state.edits["calder-a"]?.capacity)
+    )
+    .toBe(600)
+  await expectAgreement(page)
+  // Moving within the app, not reloading: a reload would solve before the edits are back.
+  await expectFleetAgreement(page, info.project.name === "mobile")
 })

@@ -17,6 +17,7 @@ import { useGrid } from "@/features/dashboard/useGrid"
 import { DaySeriesChart } from "@/features/market/DaySeriesChart"
 import { dayStats } from "@/lib/grid/analysis"
 import { periodLabel } from "@/lib/grid/profiles"
+import { ExportCsvButton } from "@/features/session/ExportCsvButton"
 
 const PAGE = 12
 
@@ -27,8 +28,8 @@ const PAGE = 12
  */
 export function MarketPage() {
   const grid = useGrid()
-  const { now, periods, period, offline, scenario } = grid
-  const stats = dayStats({ periods, offline, scenario })
+  const { now, periods, period, offline, scenario, units } = grid
+  const stats = dayStats({ periods, offline, scenario, fleet: units })
   const prev = periods[(period + 47) % 48]
   const [page, setPage] = useState(Math.floor(period / PAGE))
   const pages = Math.ceil(periods.length / PAGE)
@@ -117,9 +118,37 @@ export function MarketPage() {
             <h2 className="text-sm font-semibold tracking-tight">
               Settlement run
             </h2>
-            <p className="text-xs text-muted-foreground">
-              48 half-hours · press a row to move the clock
-            </p>
+            <div className="flex items-center gap-3">
+              <p className="hidden text-xs text-muted-foreground sm:block">
+                48 half-hours · press a row to move the clock
+              </p>
+              <ExportCsvButton
+                view="settlement"
+                filename="balance-settlement.csv"
+                rows={() => [
+                  [
+                    "Period",
+                    "Time",
+                    "Demand MW",
+                    "Price £/MWh",
+                    "Carbon gCO2/kWh",
+                    "Interconnector MW",
+                    "Unserved MW",
+                    "Price set by",
+                  ],
+                  ...periods.map((p) => [
+                    p.period + 1,
+                    periodLabel(p.period),
+                    Math.round(p.demand),
+                    Math.round(p.price * 100) / 100,
+                    Math.round(p.carbonIntensity),
+                    Math.round(p.interconnector),
+                    Math.round(p.unserved),
+                    p.marginalUnit,
+                  ]),
+                ]}
+              />
+            </div>
           </div>
           <Table label="Settlement run">
             <TableHeader>

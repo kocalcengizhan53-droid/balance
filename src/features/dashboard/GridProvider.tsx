@@ -10,8 +10,10 @@ import {
   type Period,
   type Scenario,
 } from "@/lib/grid/dispatch"
+import { applyEdits } from "@/lib/grid/edits"
 import { PERIODS } from "@/lib/grid/profiles"
 import { UNITS } from "@/lib/grid/units"
+import { useSession } from "@/features/session/useSession"
 
 /** How long the clock sits on each half-hour while it is running. */
 const TICK_MS = 720
@@ -32,7 +34,10 @@ export function GridProvider({ children }: { children: ReactNode }) {
   const [playing, setPlaying] = useState(false)
   const [scenario, setScenarioState] = useState<Scenario>(initial.scenario)
 
-  const solution = solve(offline, scenario)
+  // An operator's edits are inputs, like the units taken offline: every page solves the same fleet.
+  const { edits } = useSession()
+  const fleet = applyEdits(UNITS, edits)
+  const solution = solve(offline, scenario, fleet)
 
   useEffect(() => {
     if (!playing) return
@@ -44,9 +49,9 @@ export function GridProvider({ children }: { children: ReactNode }) {
   }, [playing])
 
   useEffect(() => {
-    publishGridState(offline, period, scenario)
+    publishGridState(offline, period, scenario, edits)
     writeUrlState({ offline, period, scenario })
-  }, [offline, period, scenario])
+  }, [offline, period, scenario, edits])
 
   const toggle = useCallback((id: string) => {
     setOffline((current) =>
@@ -74,7 +79,7 @@ export function GridProvider({ children }: { children: ReactNode }) {
     resetScenario: useCallback(() => setScenarioState(BASELINE), []),
     periods: solution.periods,
     now: solution.periods[period] as Period,
-    units: UNITS,
+    units: fleet,
   }
 
   return <GridContext.Provider value={grid}>{children}</GridContext.Provider>

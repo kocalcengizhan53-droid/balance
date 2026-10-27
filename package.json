@@ -15,7 +15,7 @@
     "qa": "playwright test",
     "qa:dev": "QA_BASE_URL=http://localhost:5173 playwright test --project=desktop",
     "qa:report": "playwright show-report qa-output/report",
-    "deploy": "npm run build && wrangler pages deploy dist --project-name=balance-dispatch --branch=main",
+    "deploy": "npm run build && wrangler d1 migrations apply balance-db --remote && wrangler pages deploy dist --project-name=balance-dispatch --branch=main",
     "posters": "node scripts/posters.mjs",
     "qa:axe": "node qa/axe.mjs",
     "qa:lighthouse": "node qa/lighthouse.mjs"
@@ -45,6 +45,7 @@
   },
   "devDependencies": {
     "@babel/core": "^7.29.7",
+    "@cloudflare/workers-types": "^5.20261021.1",
     "@eslint/js": "^10",
     "@playwright/test": "^1.64.1",
     "@rolldown/plugin-babel": "^0.2.4",

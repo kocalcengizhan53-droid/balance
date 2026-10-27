@@ -56,6 +56,8 @@ export type Solution = {
   readonly periods: readonly Period[]
   readonly offline: readonly string[]
   readonly scenario: Scenario
+  /** The fleet as solved: the units, with any operator's edits applied. */
+  readonly fleet: readonly Unit[]
 }
 
 /**
@@ -103,9 +105,9 @@ const LINK = "__link__"
 type Merit = readonly { id: string; cost: number; unit?: Unit }[]
 
 /** Built per solve, because the carbon price changes who is cheap. */
-const meritOrder = (scenario: Scenario): Merit =>
+const meritOrder = (scenario: Scenario, fleet: readonly Unit[]): Merit =>
   [
-    ...UNITS.map((unit) => ({
+    ...fleet.map((unit) => ({
       id: unit.id,
       cost: costWithCarbon(
         unit.marginalCost,
@@ -129,7 +131,8 @@ function solvePeriod(
   previous: Map<string, number>,
   offline: ReadonlySet<string>,
   scenario: Scenario,
-  merit: Merit
+  merit: Merit,
+  fleet: readonly Unit[]
 ): Period {
   const demand = Math.round(DEMAND[period] * scenario.demandScale)
   const mw = new Map<string, number>()
@@ -137,7 +140,7 @@ function solvePeriod(
   const costOf = (unit: Unit) =>
     costWithCarbon(unit.marginalCost, unit.carbon, scenario.carbonPrice)
 
-  for (const unit of UNITS) {
+  for (const unit of fleet) {
     const weather =
       unit.fuel === "wind"
         ? Math.min(1, availability(unit.fuel, period) * scenario.windScale)
@@ -179,7 +182,7 @@ function solvePeriod(
    * merit loop stopped as soon as demand was met and left a running biomass unit at zero,
    * a 420 MW step on a machine that can move 360.
    */
-  for (const unit of UNITS) {
+  for (const unit of fleet) {
     const available = availableOf.get(unit.id) ?? 0
     if (available === 0) continue
 
@@ -268,7 +271,7 @@ function solvePeriod(
     interconnector -= toExport
     surplus -= toExport
 
-    for (const unit of UNITS) {
+    for (const unit of fleet) {
       if (surplus <= 0.0001) break
       if (unit.marginalCost !== 0) continue
       const current = mw.get(unit.id) ?? 0
@@ -278,7 +281,7 @@ function solvePeriod(
       surplus -= cut
     }
 
-    for (const unit of [...UNITS].sort((a, b) => costOf(b) - costOf(a))) {
+    for (const unit of [...fleet].sort((a, b) => costOf(b) - costOf(a))) {
       if (surplus <= 0.0001) break
       if (unit.marginalCost === 0) continue
       const current = mw.get(unit.id) ?? 0
@@ -298,7 +301,7 @@ function solvePeriod(
     }
   }
 
-  const outputs = UNITS.map((unit) => ({
+  const outputs = fleet.map((unit) => ({
     unit,
     mw: Math.max(0, mw.get(unit.id) ?? 0),
     available: availableOf.get(unit.id) ?? 0,
@@ -333,23 +336,24 @@ function solvePeriod(
  */
 export function solve(
   offline: readonly string[] = [],
-  scenario: Scenario = BASELINE
+  scenario: Scenario = BASELINE,
+  fleet: readonly Unit[] = UNITS
 ): Solution {
   const off = new Set(offline)
-  const merit = meritOrder(scenario)
-  let previous = new Map<string, number>(UNITS.map((u) => [u.id, 0]))
+  const merit = meritOrder(scenario, fleet)
+  let previous = new Map<string, number>(fleet.map((u) => [u.id, 0]))
   let periods: Period[] = []
 
   for (let pass = 0; pass < 2; pass++) {
     periods = []
     for (let p = 0; p < PERIODS; p++) {
-      const solved = solvePeriod(p, previous, off, scenario, merit)
+      const solved = solvePeriod(p, previous, off, scenario, merit, fleet)
       periods.push(solved)
       previous = new Map(solved.outputs.map((o) => [o.unit.id, o.mw]))
     }
   }
 
-  return { periods, offline, scenario }
+  return { periods, offline, scenario, fleet }
 }
 
 /** Everything serving demand in a period: generation plus any import. */

@@ -53,6 +53,7 @@ import {
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useGrid } from "@/features/dashboard/useGrid"
 import { UnitSheet } from "@/features/fleet/UnitSheet"
+import { ExportCsvButton } from "@/features/session/ExportCsvButton"
 import { unitStatus, type UnitStatus } from "@/lib/grid/analysis"
 import { costWithCarbon, type UnitOutput } from "@/lib/grid/dispatch"
 import { periodLabel } from "@/lib/grid/profiles"
@@ -427,6 +428,36 @@ export function FleetPage() {
                 ))}
               </SelectContent>
             </Select>
+            <ExportCsvButton
+              view="fleet"
+              filename={`balance-fleet-${periodLabel(period).replace(":", "")}.csv`}
+              rows={() => [
+                [
+                  "Unit",
+                  "Fuel",
+                  "Status",
+                  "Output MW",
+                  "Available MW",
+                  "Capacity MW",
+                  "Minimum stable MW",
+                  "Marginal cost £/MWh",
+                  "Carbon gCO2/kWh",
+                  "Node",
+                ],
+                ...now.outputs.map((o) => [
+                  o.unit.name,
+                  FUEL_LABEL[o.unit.fuel as Series],
+                  unitStatus(o, offline, now, scenario.carbonPrice),
+                  Math.round(o.mw),
+                  Math.round(o.available),
+                  o.unit.capacity,
+                  o.unit.minStable,
+                  o.unit.marginalCost,
+                  o.unit.carbon,
+                  o.unit.node,
+                ]),
+              ]}
+            />
             <DropdownMenu>
               <DropdownMenuTrigger
                 render={<Button variant="outline" size="sm" />}

@@ -1,0 +1,16 @@
+{
+  // Cloudflare Pages: the static build plus Functions under /api, with one D1 database for the
+  // visitors' sandboxes. Deployed with `npm run deploy` (wrangler pages deploy).
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "balance-dispatch",
+  "pages_build_output_dir": "./dist",
+  "compatibility_date": "2026-10-20",
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "balance-db",
+      "database_id": "e292c561-b19f-46d6-b0bc-8bf04f2a91f8",
+      "migrations_dir": "migrations"
+    }
+  ]
+}

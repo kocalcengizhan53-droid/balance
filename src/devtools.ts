@@ -1,4 +1,5 @@
 import { BASELINE, solve, type Scenario } from "@/lib/grid/dispatch"
+import { applyEdits, type Edits } from "@/lib/grid/edits"
 import { PERIODS } from "@/lib/grid/profiles"
 import { UNITS } from "@/lib/grid/units"
 
@@ -16,6 +17,7 @@ import { UNITS } from "@/lib/grid/units"
  */
 const api = {
   solve,
+  applyEdits,
   units: UNITS,
   periodCount: PERIODS,
   /** The view's inputs, republished by useGrid whenever they change. */
@@ -23,6 +25,7 @@ const api = {
     offline: [] as readonly string[],
     period: 0,
     scenario: BASELINE as Scenario,
+    edits: {} as Edits,
   },
 }
 
@@ -40,7 +43,8 @@ export function installDevtools() {
 export function publishGridState(
   offline: readonly string[],
   period: number,
-  scenario: Scenario
+  scenario: Scenario,
+  edits: Edits
 ) {
-  if (window.__app) window.__app.state = { offline, period, scenario }
+  if (window.__app) window.__app.state = { offline, period, scenario, edits }
 }

@@ -5,7 +5,7 @@ import {
   type UnitOutput,
 } from "@/lib/grid/dispatch"
 import { periodLabel } from "@/lib/grid/profiles"
-import { INTERCONNECTOR, UNITS } from "@/lib/grid/units"
+import { INTERCONNECTOR } from "@/lib/grid/units"
 
 /**
  * Readings derived from a solved day — the figures the pages compare, rank and list.
@@ -176,7 +176,7 @@ export function events(periods: readonly Period[]): GridEvent[] {
         text: `${INTERCONNECTOR.name} ${p.interconnector > 0 ? "importing" : "exporting"} ${Math.abs(Math.round(p.interconnector)).toLocaleString("en-GB")} MW`,
       })
     }
-    for (const unit of UNITS) {
+    for (const { unit } of p.outputs) {
       const now = p.outputs.find((o) => o.unit.id === unit.id)?.mw ?? 0
       const was = q.outputs.find((o) => o.unit.id === unit.id)?.mw ?? 0
       if (now > 0.5 && was <= 0.5) {
