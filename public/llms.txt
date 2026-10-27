@@ -1,0 +1,18 @@
+# Balance
+
+> A grid control room for a fictional region, solved half-hourly by a merit-order dispatch model with minimum stable generation, ramp rates and unit commitment. Every figure and every pulse of light on the map is derived from that one model; generation plus imports plus unserved energy equals demand plus exports in all 48 periods.
+
+## Pages
+
+- [Overview](https://balance-dispatch.pages.dev/): the region as an isometric model, KPI cards with trends, the day stacked by fuel, the single-line diagram, an events feed
+- [Fleet](https://balance-dispatch.pages.dev/fleet): every unit with status, output, load, capacity, cost and carbon; take a unit offline and the day re-solves
+- [Market](https://balance-dispatch.pages.dev/market): price and carbon across the day, the supply curve, the settlement run
+- [Scenarios](https://balance-dispatch.pages.dev/scenarios): carbon price, demand and wind levers with presets, compared against the baseline
+
+## State in the URL
+
+A view's inputs live in its query string, for example `?out=calder-a,calder-b&carbon=60&demand=1.1&wind=0.4&t=36`: units offline, carbon price in £/t, demand and wind as multipliers, and the half-hour period (0–47).
+
+## Source
+
+- [GitHub](https://github.com/kocalcengizhan53-droid/balance)

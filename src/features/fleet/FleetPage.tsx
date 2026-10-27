@@ -273,6 +273,7 @@ export function FleetPage() {
       id: "actions",
       enableSorting: false,
       enableHiding: false,
+      header: () => <span className="sr-only">Actions</span>,
       cell: ({ row }) => (
         <DropdownMenu>
           <DropdownMenuTrigger

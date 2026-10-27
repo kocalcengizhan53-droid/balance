@@ -1,11 +1,17 @@
 import * as React from "react"
 import { cn } from "cn"
 
-function Table({ className, ...props }: React.ComponentProps<"table">) {
+/** `label` names the scroll container and makes it focusable, for tables that scroll sideways. */
+function Table({
+  className,
+  label,
+  ...props
+}: React.ComponentProps<"table"> & { label?: string }) {
   return (
     <div
       data-slot="table-container"
       className="relative w-full overflow-x-auto"
+      {...(label ? { role: "region", "aria-label": label, tabIndex: 0 } : {})}
     >
       <table
         data-slot="table"

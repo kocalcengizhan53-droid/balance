@@ -121,7 +121,7 @@ export function MarketPage() {
               48 half-hours · press a row to move the clock
             </p>
           </div>
-          <Table>
+          <Table label="Settlement run">
             <TableHeader>
               <TableRow className="text-xs">
                 <TableHead>Period</TableHead>

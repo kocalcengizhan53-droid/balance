@@ -16,7 +16,9 @@
     "qa:dev": "QA_BASE_URL=http://localhost:5173 playwright test --project=desktop",
     "qa:report": "playwright show-report qa-output/report",
     "deploy": "npm run build && wrangler pages deploy dist --project-name=balance-dispatch --branch=main",
-    "posters": "node scripts/posters.mjs"
+    "posters": "node scripts/posters.mjs",
+    "qa:axe": "node qa/axe.mjs",
+    "qa:lighthouse": "node qa/lighthouse.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",
@@ -56,6 +58,7 @@
     "@types/react-dom": "^19",
     "@types/three": "^0.186.0",
     "@vitejs/plugin-react": "^6",
+    "axe-core": "^4.14.0",
     "babel-plugin-react-compiler": "^1.0.0",
     "eslint": "^10",
     "eslint-plugin-react-hooks": "^7.1.1",

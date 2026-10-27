@@ -4,8 +4,20 @@ import tailwindcss from "@tailwindcss/vite"
 import react, { reactCompilerPreset } from "@vitejs/plugin-react"
 import { defineConfig } from "vitest/config"
 
+import { routePreload } from "./scripts/route-preload.js"
+
 export default defineConfig({
-  plugins: [react(), babel({ presets: [reactCompilerPreset()] }), tailwindcss()],
+  plugins: [
+    react(),
+    babel({ presets: [reactCompilerPreset()] }),
+    tailwindcss(),
+    // The lazy routes in src/router.ts, by URL.
+    routePreload({
+      "/fleet": "src/features/fleet/FleetPage.tsx",
+      "/market": "src/features/market/MarketPage.tsx",
+      "/scenarios": "src/features/scenarios/ScenariosPage.tsx",
+    }),
+  ],
   resolve: {
     alias: {
       "@": resolve(import.meta.dirname, "./src"),
@@ -21,7 +33,11 @@ export default defineConfig({
     projects: [
       {
         // The grid model is pure arithmetic and belongs in a fast node project.
-        test: { name: "unit", environment: "node", include: ["src/**/*.test.ts"] },
+        test: {
+          name: "unit",
+          environment: "node",
+          include: ["src/**/*.test.ts"],
+        },
       },
       {
         test: {
