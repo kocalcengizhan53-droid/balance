@@ -58,7 +58,10 @@ export function OverviewPage() {
 
         <div
           data-poster-hide
-          className="relative z-10 grid grid-cols-2 gap-3 pt-3 lg:-mt-24 lg:grid-cols-[20rem_repeat(4,minmax(0,1fr))_16rem] lg:px-4 lg:pt-0"
+          // Six across needs a wide screen: on a laptop the four small cards fell to ~120px and
+          // their labels ran into the info buttons, so there they sit two by two between the
+          // headline card and the levers.
+          className="relative z-10 grid grid-cols-2 gap-3 pt-3 lg:-mt-24 lg:grid-cols-[18rem_repeat(2,minmax(0,1fr))_16rem] lg:px-4 lg:pt-0 2xl:grid-cols-[20rem_repeat(4,minmax(0,1fr))_16rem]"
         >
           <KpiCard
             hero
@@ -70,7 +73,7 @@ export function OverviewPage() {
             goodWhen="down"
             insight={`${now.marginalUnit === "export" ? "Exporting" : now.marginalUnit} is setting the price`}
             basis={basis}
-            className="col-span-2 lg:col-span-1"
+            className="col-span-2 lg:col-span-1 lg:row-span-2 lg:justify-between 2xl:row-span-1"
           />
           <KpiCard
             label="Demand"
@@ -120,7 +123,7 @@ export function OverviewPage() {
             insight={headroom < 500 ? "Reserve thin" : "Reserve healthy"}
             basis={basis}
           />
-          <ScenarioPanel className="glass col-span-2 lg:col-span-1" />
+          <ScenarioPanel className="glass col-span-2 lg:col-span-1 lg:col-start-4 lg:row-span-2 lg:row-start-1 2xl:col-start-auto 2xl:row-span-1 2xl:row-start-auto" />
         </div>
       </section>
 

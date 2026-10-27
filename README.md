@@ -1,12 +1,32 @@
 # Balance
 
-A grid control room for a region that does not exist, solved half-hourly, built the way a product dashboard is built — a rail, four pages, a command palette, KPI cards that compare against the last half-hour, a table you can filter and page — where every number on every page, and every particle moving across the map, is the output of one model.
+A grid control room for a region that does not exist, solved half-hourly: an isometric model of the region where power visibly moves, built the way a product dashboard is built — a rail, four pages, a command palette, KPI cards, a table you can filter and page — where every number and every pulse of light is the output of one model.
 
 **Live:** <https://balance-dispatch.pages.dev>
 
-![Overview: the region in three dimensions, power moving along the lines to the city, KPI cards with their trend against the previous half-hour, the levers](docs/dashboard.png)
+![Overview: the region as a model on a table — plants glowing with their load, light running along the cables, the city lit at dusk — over the KPI cards and the levers](docs/dashboard.webp)
+
+## In three seconds
+
+- **Press a plant to take it out** and watch the power re-route: the cables dim and brighten, the link across the strait picks up, the price and the carbon move — on every page at once.
+- **Pull three levers** (carbon price, demand, wind) or press a preset, and every figure is re-solved against the baseline. The state lives in the URL, so a scenario is a link.
+- **One model, proven in the browser:** a merit-order dispatch with minimum stable generation, ramp rates and unit commitment; the browser suite re-solves the day and compares it with the text actually painted. Lighthouse mobile **88–90** on all four pages, accessibility 100.
 
 ---
+
+## Challenge → solution → result
+
+| The problem | What was built | Measured |
+| --- | --- | --- |
+| A data-dense dashboard reads as a spreadsheet | The region as an art-directed isometric model: plants sized by capacity and glowing with output, pulses along every cable at the solver's rate, the sun and the city's windows following the clock | The default view shows the data spatially, moving, with two levers in reach |
+| Three megabytes of WebGL made a phone wait | A poster rendered from the scene itself shows before the app's JavaScript loads; a desktop fades the live model in on idle, a phone loads it when asked | Overview mobile score **37 → 90**, blocking time **2.5 s → 30 ms** |
+| Every page shipped in one bundle | Fleet, market and scenarios load as routes; the command palette loads on first ⌘K | Fleet 88, market 89, scenarios 90 on mobile |
+| Four pages could disagree with each other | Nothing is typed into a component; one solver feeds all of them, and the browser checks the painted text against a fresh solve | 20 Vitest tests on the model, 48 Playwright checks on a desktop and a Pixel 7, axe 0 violations |
+
+<p>
+  <img src="docs/scenarios.webp" width="560" alt="Scenarios: a bad evening — calm, hot and priced — cost up 95%, imports up six-fold, thirteen half-hours short">
+  <img src="docs/phone.webp" width="160" alt="The overview on a phone: the poster of the model with an Explore in 3D button">
+</p>
 
 ## The one rule
 
@@ -20,23 +40,21 @@ to within 0.1 MW, in all forty-eight periods, under every lever, and still true 
 
 ## The pages
 
-**Overview.** The region as a place: plants where they stand, sized by capacity and lit by their output; power as particles, a count of them proportional to the megawatts and a speed set by how hard the plant behind them is working; the sun crossing with the clock, the city lighting at dusk. Beneath it, the instruments: five KPI cards with a trend badge against the previous half-hour, the day stacked by fuel with a range control and a pointer readout, the system as a single-line diagram, and an events feed — every line of it a diff between two consecutive solves.
+**Overview.** The region as a model on a table, seen from one fixed isometric angle so it composes like an illustration rather than a game level: plants where they stand, sized by capacity and glowing with their output; power as pulses of light along the cables, as many as the megawatts call for and as fast as the plant behind them is working; the sun crossing with the clock, the city's windows coming up at dusk. Beneath it, the instruments: five KPI cards with a trend badge against the previous half-hour, the day stacked by fuel with a range control and a pointer readout, the system as a single-line diagram, and an events feed — every line of it a diff between two consecutive solves.
 
-**Fleet.** The table every template has, with the solver underneath it: tabs by status, search, a fuel filter, a column menu, row selection with a bulk action, sortable headers, status badges, a pager, and a drawer per unit with its day as a sparkline and the one switch that takes it out.
+**Fleet.** The table every template has, built on TanStack Table, with the solver underneath it: tabs by status, search, a fuel filter, a column menu, row selection with a bulk action, sortable headers, status badges, a pager, and a drawer per unit with its day as a sparkline and the one switch that takes it out.
 
-![The fleet table, and the drawer behind a row](docs/fleet-drawer.png)
+![The fleet table, and the drawer behind a row](docs/fleet-drawer.webp)
 
 **Market.** Price and carbon across the day as two charts rather than one with two axes, the supply curve for the selected half-hour, and the settlement run paged twelve half-hours at a time — the statement a trading desk would reconcile against.
 
-![The market: price and carbon across the day, the supply curve, the settlement run](docs/market.png)
+![The market: price and carbon across the day, the supply curve, the settlement run](docs/market.webp)
 
 **Scenarios.** Three levers — carbon price, demand, wind — five presets worth pressing, and every figure against the baseline. Each comparison is two solves of the same model, nothing interpolated.
 
-![A bad evening: calm, hot and priced — cost up 95%, imports up six-fold, thirteen half-hours short](docs/scenarios.png)
-
 The view's inputs live in the URL — `?out=calder-a,calder-b&carbon=60&demand=1.1&wind=0.4&t=36` — so a scenario is a link somebody can send, and a reload is not a reset. Only inputs are stored, never a result.
 
-![Two gas stations out and a carbon price on, from a link: the plants struck through, the frequency drooping, the rail saying so](docs/shortfall.png)
+![Two gas stations out and a carbon price on, from a link: the plants struck through, the frequency drooping, the rail saying so](docs/shortfall.webp)
 
 ## What the model actually does
 
@@ -55,15 +73,15 @@ The levers found a second defect the baseline could not reach. With the link imp
 
 Dark by default, because the room it is modelled on is dark. Every surface is biased a few steps toward blue so the fuel colours sit on something with a temperature; every figure is set in a mono instrument face so the digits hold still as the clock runs; one amber means *live* and is used for nothing else. The light theme is designed rather than inverted.
 
-![The light theme](docs/light.png)
+![The light theme](docs/light.webp)
 
-The scene is [React Three Fiber](src/features/scene/RegionScene.tsx) and fetches nothing — three light panels baked once, a terrain of three sines, colours read from the page's own stylesheet so the plants are exactly the hues the charts use. It arrives in its own chunk after the instruments have painted, a viewport-aware camera pulls back and widens on a phone, and where there is no WebGL the single-line diagram stands in. Its labels are ordinary DOM moved by a projector each frame rather than drei's portalled `<Html>`, which on React 19 removes a node its parent has already removed every time the page is left.
+The scene is [React Three Fiber](src/features/scene/RegionScene.tsx) and fetches nothing: the board, plants, city and cables are built in code, the colours read from the page's own stylesheet so the plants are exactly the hues the charts use, and bloom is on in the dark theme only. Until it runs, the stage shows a poster rendered from the same scene by `npm run posters` — one per theme and shape — which a boot shell in `index.html` paints before the app's JavaScript loads; where there is no WebGL the single-line diagram stands in. Its labels are ordinary DOM moved by a projector each frame rather than drei's portalled `<Html>`, which on React 19 removes a node its parent has already removed every time the page is left.
 
 The fuel palette is checked rather than chosen: eight categorical hues validated for deuteranopia, protanopia and tritanopia separation, normal-vision separation and contrast against each theme's card surface. Four hues sit under 3:1 on their surface, which is why every series also has a labelled readout and a table.
 
 ## The checks
 
-Seventeen Vitest tests on the model and the readings derived from it. Forty-four Playwright checks in [`e2e/`](e2e), run against the production bundle on a desktop and a Pixel 7.
+Twenty Vitest tests on the model, the readings derived from it and the scene layout. Forty-eight Playwright checks in [`e2e/`](e2e), run against the production bundle on a desktop and a Pixel 7 — including [`scene.spec.ts`](e2e/scene.spec.ts), which holds the poster on a phone until the visitor asks for the model.
 
 The load-bearing one is [`figures.spec.ts`](e2e/figures.spec.ts). The rule above is that no number is typed into a component, and a unit test cannot see that — it can only check the solver, and the solver was never what was at risk. So the browser re-solves the day from the view's own inputs and compares the result against the text actually painted — on the overview and row by row on the fleet page, at rest, after the period changes, and with two units offline.
 
@@ -83,6 +101,7 @@ npm run check        # typecheck, lint, Vitest, build
 npm run qa           # builds, serves the bundle, runs the browser checks
 npm run qa:dev       # the same checks against the dev server
 
+npm run posters      # re-render the scene posters from the live model
 npm run deploy       # builds and ships dist/ to Cloudflare Pages
 ```
 
@@ -90,7 +109,7 @@ npm run deploy       # builds and ships dist/ to Cloudflare Pages
 
 ## Stack
 
-Vite 8 · React 19.3 with the React Compiler · TypeScript 6 · Tailwind CSS v4 · shadcn/ui on Base UI · React Router 8 · three 0.186 / React Three Fiber 9.8 / drei · Motion 14 · cmdk · Vitest 5 · Playwright · Cloudflare Pages.
+Vite 8 · React 19.3 with the React Compiler · TypeScript 6 · Tailwind CSS v4 · shadcn/ui on Base UI · React Router 8 · TanStack Table 8 · three 0.186 / React Three Fiber 9.8 / drei / postprocessing · Motion 14 · cmdk · Vitest 5 · Playwright · Cloudflare Pages.
 
 No charting library: every mark is an SVG path built from the solved periods, so the geometry and the figures cannot come from different places.
 
