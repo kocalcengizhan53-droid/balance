@@ -1,4 +1,11 @@
 import { ArrowDownRight, ArrowUpRight, Minus } from "lucide-react"
+import { Info } from "lucide-react"
+
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 
 import { AnimatedNumber } from "@/components/animated-number"
 import { Badge } from "@/components/ui/badge"
@@ -22,6 +29,7 @@ export function KpiCard({
   goodWhen = "up",
   tone = "normal",
   hero = false,
+  hint,
   className = "",
 }: {
   label: string
@@ -35,6 +43,8 @@ export function KpiCard({
   goodWhen?: "up" | "down" | "none"
   tone?: "normal" | "warning"
   hero?: boolean
+  /** What the figure means, for someone who does not run a grid. Shown from an info button. */
+  hint?: string
   className?: string
 }) {
   const change =
@@ -58,7 +68,27 @@ export function KpiCard({
       className={`glass flex flex-col gap-3 px-4 py-3.5 ${className}`}
     >
       <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1">
-        <p className="label">{label}</p>
+        <p className="flex items-center gap-1 label">
+          {label}
+          {hint ? (
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <button
+                    type="button"
+                    aria-label={`What is ${label.toLowerCase()}?`}
+                    className="-m-1 inline-grid size-6 place-items-center rounded-full text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
+                  />
+                }
+              >
+                <Info className="size-3" aria-hidden="true" />
+              </TooltipTrigger>
+              <TooltipContent className="max-w-60 text-xs leading-snug normal-case">
+                {hint}
+              </TooltipContent>
+            </Tooltip>
+          ) : null}
+        </p>
         {change !== null ? (
           <Badge
             variant="outline"

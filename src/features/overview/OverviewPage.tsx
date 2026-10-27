@@ -1,4 +1,3 @@
-import { Suspense, lazy } from "react"
 import { AnimatePresence, motion } from "motion/react"
 import { Link } from "react-router"
 
@@ -8,17 +7,8 @@ import { ScenarioPanel } from "@/features/dashboard/ScenarioPanel"
 import { Schematic } from "@/features/dashboard/Schematic"
 import { useGrid } from "@/features/dashboard/useGrid"
 import { EventsFeed } from "@/features/overview/EventsFeed"
+import { SceneStage } from "@/features/overview/SceneStage"
 import { periodLabel } from "@/lib/grid/profiles"
-
-/*
- * The scene is three, fiber and drei — two thirds of the bundle. It arrives in its own chunk,
- * after the instruments have painted, and the diagram holds its place until it does.
- */
-const RegionScene = lazy(() =>
-  import("@/features/scene/RegionScene").then((m) => ({
-    default: m.RegionScene,
-  }))
-)
 
 export function OverviewPage() {
   const grid = useGrid()
@@ -45,13 +35,16 @@ export function OverviewPage() {
       {/* The region first, as a place, with the instruments laid over its foot. */}
       <section className="relative">
         <div className="relative flex h-[56svh] min-h-[28rem] flex-col overflow-hidden rounded-xl lg:block lg:h-[60svh] lg:min-h-[34rem]">
-          <div className="pointer-events-none px-4 pt-4 sm:px-6 lg:absolute lg:inset-x-6 lg:top-5 lg:z-10 lg:px-0 lg:pt-0">
+          <div
+            data-poster-hide
+            className="pointer-events-none px-4 pt-4 sm:px-6 lg:absolute lg:inset-x-6 lg:top-5 lg:z-10 lg:px-0 lg:pt-0"
+          >
             <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
               Overview
             </h1>
             <p className="mt-1 max-w-md text-sm text-muted-foreground">
-              A fictional region, solved half-hourly. Drag to look around, press
-              a plant to take it out.
+              A fictional region, solved half-hourly. Press a plant to take it
+              out and watch where the power comes from instead.
             </p>
             <p className="mt-2 label">
               Settlement period {String(now.period + 1).padStart(2, "0")} of 48
@@ -59,16 +52,18 @@ export function OverviewPage() {
             </p>
           </div>
           <div className="relative min-h-0 flex-1 lg:absolute lg:inset-0">
-            <Suspense fallback={placeholder}>
-              <RegionScene fallback={placeholder} />
-            </Suspense>
+            <SceneStage fallback={placeholder} />
           </div>
         </div>
 
-        <div className="relative z-10 grid grid-cols-2 gap-3 pt-3 lg:-mt-24 lg:grid-cols-[20rem_repeat(4,minmax(0,1fr))_16rem] lg:px-4 lg:pt-0">
+        <div
+          data-poster-hide
+          className="relative z-10 grid grid-cols-2 gap-3 pt-3 lg:-mt-24 lg:grid-cols-[20rem_repeat(4,minmax(0,1fr))_16rem] lg:px-4 lg:pt-0"
+        >
           <KpiCard
             hero
             label="Carbon intensity"
+            hint="Grams of CO₂ emitted for each kilowatt-hour generated right now. It falls when wind, solar, nuclear or hydro carry more of the load."
             value={now.carbonIntensity}
             previous={prev.carbonIntensity}
             unit="gCO₂/kWh"
@@ -79,6 +74,7 @@ export function OverviewPage() {
           />
           <KpiCard
             label="Demand"
+            hint="How much power the region is using this half-hour, in gigawatts. Generation is solved to match it exactly."
             value={now.demand / 1000}
             previous={prev.demand / 1000}
             decimals={2}
@@ -89,6 +85,7 @@ export function OverviewPage() {
           />
           <KpiCard
             label="Price"
+            hint="The wholesale price, set by the most expensive plant still needed — the marginal unit — in pounds per megawatt-hour."
             value={now.price}
             previous={prev.price}
             prefix="£"
@@ -103,6 +100,7 @@ export function OverviewPage() {
           />
           <KpiCard
             label="Interconnector"
+            hint="The link across the strait. Positive means importing from the neighbour, negative means exporting to it."
             value={Math.abs(now.interconnector)}
             previous={Math.abs(prev.interconnector)}
             prefix={now.interconnector >= 0 ? "+" : "−"}
@@ -113,6 +111,7 @@ export function OverviewPage() {
           />
           <KpiCard
             label="Spare capacity"
+            hint="Megawatts the plants that are available could still add. Under 500 MW the system is one trip away from a shortfall."
             value={headroom}
             previous={prevHeadroom}
             unit="MW"

@@ -96,10 +96,20 @@ test("the plant's own label in the scene takes it offline too", async ({
 }, info) => {
   test.skip(
     info.project.name === "mobile",
-    "the scene hides its labels on a phone"
+    "on a phone the scene is a picture until it is asked for"
+  )
+  test.skip(
+    !!process.env.CI,
+    "the CI runner has no GPU, so the live scene never starts"
   )
   await page.goto("/")
-  const pill = page.getByRole("button", { name: /^Hartmoor, \d/ }).first()
+  await expect(page.locator('[data-scene="live"]')).toBeVisible({
+    timeout: 20_000,
+  })
+  // The scene's own label, not the diagram row of the same name further down the page.
+  const pill = page
+    .getByRole("group", { name: "Plants in the region" })
+    .getByRole("button", { name: /^Hartmoor, \d/ })
   await pill.click({ force: true })
   await expect(pill).toHaveAttribute("aria-pressed", "true")
   await toPage(page, "Fleet", info.project.name === "mobile")

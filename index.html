@@ -1,13 +1,56 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" class="dark">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>vite-app</title>
+    <title>Balance — a grid control room you can run</title>
+    <meta
+      name="description"
+      content="An energy-grid dispatch dashboard: a fictional region solved half-hourly by a merit-order model, drawn as a live isometric model. Trip a plant, move the levers, watch the price, carbon and flows answer."
+    />
+    <meta name="theme-color" content="#0b0e14" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Balance" />
+    <meta property="og:title" content="Balance — a grid control room you can run" />
+    <meta
+      property="og:description"
+      content="A fictional region solved half-hourly and drawn as a live model. Trip a plant and watch where the power comes from instead."
+    />
+    <meta property="og:url" content="https://balance-dispatch.pages.dev/" />
+    <meta property="og:image" content="https://balance-dispatch.pages.dev/og.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <!-- The stage's picture of the scene, so the overview paints the region before any JavaScript. -->
+    <link rel="preload" as="image" href="/scene-dark-wide.webp" media="(min-width: 768px)" fetchpriority="high" />
+    <link rel="preload" as="image" href="/scene-dark-tall.webp" media="(max-width: 767px)" fetchpriority="high" />
+    <style>
+      /* The first paint, before any JavaScript: the page colour and the stage's picture where the
+         stage will stand. React replaces all of it on mount with the same picture in place. */
+      html { background: #0b0e14; }
+      html.light { background: #f5f6f8; }
+      .boot { position: fixed; inset: 0; }
+      /* Below lg the page title sits above the scene, inside the same box; from lg it floats over it. */
+      .boot img { position: absolute; left: 12px; width: calc(100% - 24px); top: 202px;
+        height: calc(max(56svh, 28rem) - 134px); object-fit: cover; border-radius: 12px; }
+      @media (min-width: 768px) { .boot img { left: 272px; width: calc(100% - 296px); top: 214px; } }
+      @media (min-width: 1024px) { .boot img { top: 80px; height: max(60svh, 34rem); } }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root"><div class="boot" aria-hidden="true"><img id="boot-poster" alt="" fetchpriority="high" /></div></div>
+    <script>
+      // Pick the theme and the picture's shape before the first paint.
+      try {
+        var t = localStorage.getItem("theme");
+        var light = t === "light" || (t === "system" && matchMedia("(prefers-color-scheme: light)").matches);
+        if (light) document.documentElement.className = "light";
+        var shape = matchMedia("(max-width: 767px)").matches ? "tall" : "wide";
+        document.getElementById("boot-poster").src = "/scene-" + (light ? "light" : "dark") + "-" + shape + ".webp";
+      } catch (e) {}
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

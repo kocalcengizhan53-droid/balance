@@ -28,4 +28,14 @@ export default defineConfig([
     files: ['src/components/ui/**/*.tsx'],
     rules: { 'react-refresh/only-export-components': 'off' },
   },
+  {
+    /*
+     * The scene owns three.js objects — materials, uniforms — that are mutable by design and
+     * are updated from effects and from the frame loop. The compiler rule against mutating a
+     * value once it has been handed to JSX cannot know that; the compiler leaves these
+     * components unmemoised, which is what a render loop wants anyway.
+     */
+    files: ['src/features/scene/**/*.{ts,tsx}'],
+    rules: { 'react-hooks/immutability': 'off' },
+  },
 ])

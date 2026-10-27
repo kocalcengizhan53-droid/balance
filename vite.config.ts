@@ -11,6 +11,12 @@ export default defineConfig({
       "@": resolve(import.meta.dirname, "./src"),
     },
   },
+  build: {
+    // The 3D scene is one lazy chunk of about a megabyte (three, fiber, drei, postprocessing),
+    // loaded only on a desktop once the page is idle, or on a phone when asked. Everything a
+    // visitor needs to see the overview is in the much smaller entry chunk.
+    chunkSizeWarningLimit: 1100,
+  },
   test: {
     projects: [
       {

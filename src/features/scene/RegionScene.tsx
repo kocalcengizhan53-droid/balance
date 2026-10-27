@@ -1,764 +1,307 @@
-import { useEffect, useMemo, useRef, type ReactNode } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { Canvas, useFrame, useThree } from "@react-three/fiber"
-import {
-  Environment,
-  Grid,
-  Lightformer,
-  Line,
-  OrbitControls,
-  PerspectiveCamera,
-} from "@react-three/drei"
+import { OrbitControls, OrthographicCamera } from "@react-three/drei"
+import { Bloom, EffectComposer } from "@react-three/postprocessing"
 import { useReducedMotion } from "motion/react"
+import type { OrbitControls as OrbitControlsImpl } from "three-stdlib"
 import * as THREE from "three"
 
 import { useGrid } from "@/features/dashboard/useGrid"
+import { Board } from "@/features/scene/Board"
+import { Cables, Pylons } from "@/features/scene/Cables"
+import { buildCables } from "@/features/scene/routing"
+import { City } from "@/features/scene/City"
+import { daylight } from "@/features/scene/daylight"
+import { Projector, SceneLabels, type LabelSpec } from "@/features/scene/Labels"
 import {
-  BUS,
-  LINK_AT,
-  LINK_AWAY,
+  LINK_FAR,
   NODE_AT,
-  REGION,
+  ON_PLATEAU,
+  PLATEAU,
   UNIT_AT,
-  terrainHeight,
-  type Vec2,
 } from "@/features/scene/layout"
 import {
+  useDark,
   useFuelHex,
   useSceneTheme,
   type SceneTheme,
 } from "@/features/scene/palette"
-import type { Period, UnitOutput } from "@/lib/grid/dispatch"
-import {
-  INTERCONNECTOR,
-  NODES,
-  UNITS,
-  type NodeId,
-  type Unit,
-} from "@/lib/grid/units"
+import { useMaterials, type Materials } from "@/features/scene/materials"
+import { Plant } from "@/features/scene/Plants"
+import { INTERCONNECTOR, NODES, type NodeId, type Unit } from "@/lib/grid/units"
 import type { Series } from "@/lib/viz/fuel"
 
 /**
- * The region, as a place.
+ * The region, as a model on a table.
  *
  * Everything above this on the page is an instrument; this is the thing the instruments are
- * reading. Plants stand where they stand, sized by capacity and lit by their output; power
- * moves as particles along the lines, each line carrying a count of them proportional to the
- * megawatts on it and moving at a speed set by how hard the plant behind it is working; the
- * sun crosses the sky with the clock, so the solar farm comes alive at nine and the city
- * lights come up at dusk. Take a plant out and its particles stop, and the ones feeding the
- * city from the east thicken, because that is what the solver decided.
+ * reading, seen from one fixed, isometric angle so it composes like an illustration rather
+ * than a game level. Plants glow with their load, light runs along the cables at the rate the
+ * solver says power does, and the clock sets the light: the solar farm comes alive at nine and
+ * the city's windows come up at dusk. Press a plant to take it out of service and watch where
+ * the power comes from instead.
  *
- * Nothing is fetched. The environment is three light panels baked once; the terrain is three
- * sines; the colours are read from the page's own stylesheet.
+ * Nothing is fetched: geometry is built in code, the colours come from the page's stylesheet.
  */
 
-const at = ([x, z]: Vec2): [number, number, number] => [
-  x,
-  terrainHeight(x, z),
-  z,
-]
-const lift = (
-  p: [number, number, number],
-  dy: number
-): [number, number, number] => [p[0], p[1] + dy, p[2]]
+const TARGET = new THREE.Vector3(1.1, 0.4, 0)
+// Seen from the south-west, so the far corner is the strait, top right, and the top left of the
+// stage stays clear for the page title.
+const AZIMUTH = -0.55
+const POLAR = 0.98
 
-/* ---------- Ground --------------------------------------------------------------------- */
+/** Where each plant's label hangs: above whatever its body is. */
+function labelHeight(unit: Unit) {
+  const base = ON_PLATEAU.has(unit.id) ? PLATEAU.height : 0
+  const body =
+    { wind: 3.1, nuclear: 2.9, gas: 2.4, biomass: 1.8, hydro: 1.3, solar: 0.9 }[
+      unit.fuel as string
+    ] ?? 0.9
+  return base + body
+}
 
-function Terrain({ theme }: { theme: SceneTheme }) {
-  const geometry = useMemo(() => {
-    const g = new THREE.PlaneGeometry(
-      REGION.width,
-      REGION.depth,
-      REGION.segments,
-      Math.round((REGION.segments * REGION.depth) / REGION.width)
-    )
-    g.rotateX(-Math.PI / 2)
-    const pos = g.attributes.position
-    for (let i = 0; i < pos.count; i++) {
-      pos.setY(i, terrainHeight(pos.getX(i), pos.getZ(i)))
-    }
-    g.computeVertexNormals()
-    return g
-  }, [])
-
+function Substation({
+  id,
+  load,
+  materials,
+  theme,
+}: {
+  id: NodeId
+  load: number
+  materials: Materials
+  theme: SceneTheme
+}) {
+  const [x, z] = NODE_AT[id]
   return (
-    <group>
-      <mesh geometry={geometry} receiveShadow>
+    <group position={[x, 0, z]}>
+      <mesh
+        position-y={0.01}
+        rotation-x={-Math.PI / 2}
+        material={materials.pad}
+        receiveShadow
+      >
+        <circleGeometry args={[0.75, 32]} />
+      </mesh>
+      <mesh position-y={0.025} rotation-x={-Math.PI / 2}>
+        <ringGeometry args={[0.62, 0.72, 40]} />
         <meshStandardMaterial
-          color={theme.ground}
-          emissive={theme.ground}
-          emissiveIntensity={0.35}
-          flatShading
-          roughness={0.95}
+          color={theme.structure}
+          emissive={theme.structure}
+          emissiveIntensity={0.1 + load * 0.9}
+          toneMapped={false}
         />
       </mesh>
-      <Grid
-        position={[0, 0.02, 0]}
-        args={[40, 30]}
-        cellSize={1}
-        cellThickness={0.6}
-        cellColor={theme.cell}
-        sectionSize={5}
-        sectionThickness={1}
-        sectionColor={theme.section}
-        fadeDistance={30}
-        fadeStrength={1.4}
-        followCamera={false}
-        infiniteGrid={false}
-      />
+      {[-0.2, 0.2].map((dx) => (
+        <mesh
+          key={dx}
+          position={[dx, 0.2, 0]}
+          material={materials.structure}
+          castShadow
+        >
+          <boxGeometry args={[0.24, 0.4, 0.36]} />
+        </mesh>
+      ))}
     </group>
   )
 }
 
-/* ---------- Sky ------------------------------------------------------------------------ */
-
-/** Hour of the day → where the sun is and how strong. Night keeps a low blue ambient. */
-function sunFor(period: number) {
-  const hour = period / 2
-  const t = (hour - 6) / 12 // 0 at sunrise, 1 at sunset
-  const elevation = Math.sin(Math.max(0, Math.min(1, t)) * Math.PI)
-  const azimuth = ((hour - 12) / 12) * Math.PI // east → west
-  const up = hour >= 6 && hour <= 18
-  return {
-    position: [
-      Math.cos(azimuth) * 22,
-      up ? 2 + elevation * 20 : -4,
-      Math.sin(azimuth) * 10 + 8,
-    ] as [number, number, number],
-    strength: up ? 0.35 + elevation * 2.1 : 0,
-    warmth: up ? 1 - Math.min(1, elevation * 2.2) : 1, // 1 at the horizon
-    night: up ? 1 - Math.min(1, elevation * 3) : 1,
-  }
-}
-
-function Sky({ period, theme }: { period: number; theme: SceneTheme }) {
-  const sun = sunFor(period)
-  const sunColour = new THREE.Color(theme.sunDay).lerp(
-    new THREE.Color(theme.sunDusk),
-    sun.warmth
+function Lights({
+  period,
+  theme,
+  dark,
+}: {
+  period: number
+  theme: SceneTheme
+  dark: boolean
+}) {
+  const d = daylight(period)
+  // A pale board under the same lamp as a dark one would burn out to white.
+  const k = dark ? 1 : 0.55
+  const key = new THREE.Color(theme.keyDay).lerp(
+    new THREE.Color(theme.keyDusk),
+    d.warmth
   )
-  const skyColour = new THREE.Color(theme.skyDay).lerp(
+  key.lerp(new THREE.Color(theme.keyNight), d.night * 0.9)
+  const sky = new THREE.Color(theme.skyDay).lerp(
     new THREE.Color(theme.skyNight),
-    sun.night
+    d.night
   )
   return (
     <>
-      <hemisphereLight args={[skyColour, theme.ground, 0.9]} />
-      <ambientLight intensity={0.32 + sun.night * 0.1} />
+      <hemisphereLight args={[sky, theme.side, (1.3 + d.day * 0.5) * k]} />
+      <ambientLight intensity={0.45 * k} />
       <directionalLight
-        position={sun.position}
-        intensity={sun.strength}
-        color={sunColour}
+        position={[-15, 20, 4]}
+        intensity={(1.9 + d.day * 1.5) * (1 - d.night * 0.45) * k}
+        color={key}
         castShadow
-        shadow-mapSize={[1024, 1024]}
+        shadow-mapSize={[2048, 2048]}
         shadow-camera-left={-18}
         shadow-camera-right={18}
         shadow-camera-top={14}
         shadow-camera-bottom={-14}
         shadow-camera-near={1}
         shadow-camera-far={60}
-        shadow-bias={-0.0008}
+        shadow-bias={-0.0006}
+        shadow-normalBias={0.02}
       />
-      <Environment resolution={128} frames={1} environmentIntensity={0.35}>
-        <Lightformer
-          form="rect"
-          intensity={2}
-          position={[0, 8, -10]}
-          scale={[20, 6, 1]}
-          color="#dfe7ff"
-        />
-        <Lightformer
-          form="rect"
-          intensity={1.2}
-          position={[-12, 5, 4]}
-          rotation-y={Math.PI / 2}
-          scale={[10, 4, 1]}
-          color="#ffe6c4"
-        />
-        <Lightformer
-          form="ring"
-          intensity={0.8}
-          position={[10, 10, 6]}
-          scale={6}
-          color="#ffffff"
-        />
-      </Environment>
     </>
   )
 }
-
-/* ---------- The city, at the busbar ------------------------------------------------------ */
-
-const CITY = Array.from({ length: 36 }, (_, i) => {
-  const gx = (i % 6) - 2.5
-  const gz = Math.floor(i / 6) - 2.5
-  const seed = Math.abs(Math.sin(i * 12.9898) * 43758.5453) % 1
-  return {
-    x: gx * 0.46 + (seed - 0.5) * 0.12,
-    z: gz * 0.46 + (seed - 0.5) * 0.12,
-    h: 0.35 + seed * 1.1 + (Math.abs(gx) + Math.abs(gz) < 2 ? 0.7 : 0),
-    w: 0.26 + seed * 0.14,
-  }
-})
-
-function City({
-  demand,
-  peak,
-  night,
-  theme,
-}: {
-  demand: number
-  peak: number
-  night: number
-  theme: SceneTheme
-}) {
-  const base = at(BUS)
-  const load = demand / peak
-  const glow = (0.15 + load * 0.85) * (0.35 + night * 0.65)
-  return (
-    <group position={base}>
-      {CITY.map((b, i) => (
-        <mesh key={i} position={[b.x, b.h / 2, b.z]} castShadow receiveShadow>
-          <boxGeometry args={[b.w, b.h, b.w]} />
-          <meshStandardMaterial
-            color={theme.node}
-            emissive={theme.city}
-            emissiveIntensity={glow * (0.5 + ((i * 7) % 5) / 8)}
-            roughness={0.6}
-          />
-        </mesh>
-      ))}
-      <pointLight
-        position={[0, 1.6, 0]}
-        color={theme.city}
-        intensity={glow * 14}
-        distance={9}
-        decay={2}
-      />
-    </group>
-  )
-}
-
-/* ---------- Plants -------------------------------------------------------------------- */
-
-const sizeOf = (unit: Unit) => 0.4 + Math.sqrt(unit.capacity) / 40
-
-function Blades({ speed }: { speed: number }) {
-  const ref = useRef<THREE.Group>(null)
-  useFrame((_, delta) => {
-    if (ref.current) ref.current.rotation.z -= delta * speed
-  })
-  return (
-    <group ref={ref}>
-      {[0, 1, 2].map((i) => (
-        <mesh key={i} rotation-z={(i * Math.PI * 2) / 3} position-y={0}>
-          <boxGeometry args={[0.07, 1.25, 0.03]} />
-          <meshStandardMaterial color="#f4f6fa" roughness={0.5} />
-        </mesh>
-      ))}
-    </group>
-  )
-}
-
-function Plant({
-  unit,
-  out,
-  colour,
-  offline,
-  onToggle,
-  theme,
-}: {
-  unit: Unit
-  out: UnitOutput
-  colour: string
-  offline: boolean
-  onToggle: () => void
-  theme: SceneTheme
-}) {
-  const p = at(UNIT_AT[unit.id])
-  const s = sizeOf(unit)
-  const load = out.available > 0 ? out.mw / out.available : 0
-  const emissive = offline ? 0 : 0.12 + load * 1.1
-  const material = (
-    <meshStandardMaterial
-      color={offline ? theme.cell : colour}
-      emissive={colour}
-      emissiveIntensity={emissive}
-      roughness={0.45}
-      metalness={0.1}
-      wireframe={offline}
-    />
-  )
-
-  let body: React.ReactNode
-  switch (unit.fuel) {
-    case "wind":
-      body = (
-        <>
-          <mesh position-y={s * 1.1} castShadow>
-            <cylinderGeometry args={[0.05, 0.09, s * 2.2, 10]} />
-            {material}
-          </mesh>
-          <group position={[0, s * 2.2, 0.12]}>
-            <mesh castShadow>
-              <boxGeometry args={[0.22, 0.16, 0.3]} />
-              {material}
-            </mesh>
-            <group position-z={0.2}>
-              <Blades speed={offline ? 0 : 0.6 + load * 5} />
-            </group>
-          </group>
-        </>
-      )
-      break
-    case "solar":
-      body = (
-        <group>
-          {[-0.7, 0, 0.7].map((dx) => (
-            <mesh
-              key={dx}
-              position={[dx, 0.3, 0]}
-              rotation-x={-0.55}
-              castShadow
-            >
-              <boxGeometry args={[0.6, 0.04, 1.1]} />
-              {material}
-            </mesh>
-          ))}
-        </group>
-      )
-      break
-    case "nuclear":
-      body = (
-        <>
-          <mesh position-y={s * 0.45} castShadow>
-            <cylinderGeometry args={[s * 0.75, s * 0.8, s * 0.9, 24]} />
-            {material}
-          </mesh>
-          <mesh position-y={s * 0.9} castShadow>
-            <sphereGeometry
-              args={[s * 0.75, 24, 16, 0, Math.PI * 2, 0, Math.PI / 2]}
-            />
-            {material}
-          </mesh>
-          <mesh position={[s * 1.2, s * 0.55, s * 0.4]} castShadow>
-            <boxGeometry args={[s * 0.9, s * 1.1, s * 0.7]} />
-            {material}
-          </mesh>
-        </>
-      )
-      break
-    case "gas":
-      body = (
-        <>
-          <mesh position-y={s * 0.4} castShadow>
-            <boxGeometry args={[s * 1.4, s * 0.8, s * 0.9]} />
-            {material}
-          </mesh>
-          {[-0.35, 0.35].map((dx) => (
-            <mesh key={dx} position={[dx * s, s * 1.3, -s * 0.2]} castShadow>
-              <cylinderGeometry args={[0.09, 0.12, s * 1.8, 12]} />
-              {material}
-            </mesh>
-          ))}
-        </>
-      )
-      break
-    case "biomass":
-      body = (
-        <>
-          <mesh position-y={s * 0.45} castShadow>
-            <boxGeometry args={[s * 1.1, s * 0.9, s * 0.8]} />
-            {material}
-          </mesh>
-          <mesh position={[s * 0.35, s * 1.2, 0]} castShadow>
-            <cylinderGeometry args={[0.08, 0.1, s * 1.4, 12]} />
-            {material}
-          </mesh>
-        </>
-      )
-      break
-    case "hydro":
-      body = (
-        <mesh position-y={s * 0.35} rotation-y={0.5} castShadow>
-          <boxGeometry args={[s * 2.4, s * 0.7, s * 0.35]} />
-          {material}
-        </mesh>
-      )
-      break
-    default:
-      body = (
-        <group>
-          {[-0.3, 0.3].map((dx) => (
-            <mesh key={dx} position={[dx, 0.3, 0]} castShadow>
-              <boxGeometry args={[0.5, 0.6, 0.9]} />
-              {material}
-            </mesh>
-          ))}
-        </group>
-      )
-  }
-
-  return (
-    <group position={p}>
-      <group onClick={(e) => (e.stopPropagation(), onToggle())}>
-        {body}
-        {/* A pad under every plant: the hit target, and where the label hangs from. */}
-        <mesh position-y={0.03} rotation-x={-Math.PI / 2} receiveShadow>
-          <circleGeometry args={[Math.max(1.1, s * 1.4), 32]} />
-          <meshStandardMaterial
-            color={theme.cell}
-            transparent
-            opacity={0.55}
-            roughness={1}
-          />
-        </mesh>
-      </group>
-    </group>
-  )
-}
-
-/* ---------- Nodes and the link ---------------------------------------------------------- */
-
-function Node({
-  id,
-  mw,
-  capacity,
-  theme,
-}: {
-  id: NodeId
-  mw: number
-  capacity: number
-  theme: SceneTheme
-}) {
-  const p = at(NODE_AT[id])
-  const load = capacity > 0 ? mw / capacity : 0
-  return (
-    <group position={p}>
-      <mesh position-y={0.06} rotation-x={-Math.PI / 2}>
-        <ringGeometry args={[0.55, 0.72, 40]} />
-        <meshStandardMaterial
-          color={theme.node}
-          emissive={theme.node}
-          emissiveIntensity={0.15 + load * 0.9}
-          side={THREE.DoubleSide}
-        />
-      </mesh>
-      <mesh position-y={0.7} castShadow>
-        <cylinderGeometry args={[0.05, 0.05, 1.4, 8]} />
-        <meshStandardMaterial color={theme.node} roughness={0.4} />
-      </mesh>
-    </group>
-  )
-}
-
-function Pylon({ theme }: { theme: SceneTheme }) {
-  const p = at(LINK_AT)
-  return (
-    <group position={p}>
-      <mesh position-y={1.3} castShadow>
-        <cylinderGeometry args={[0.04, 0.12, 2.6, 4]} />
-        <meshStandardMaterial color={theme.node} roughness={0.5} />
-      </mesh>
-      <mesh position-y={2.2} rotation-y={Math.PI / 4}>
-        <boxGeometry args={[1.6, 0.06, 0.06]} />
-        <meshStandardMaterial color={theme.node} />
-      </mesh>
-    </group>
-  )
-}
-
-/* ---------- Power, moving ------------------------------------------------------------- */
-
-type Flow = {
-  curve: THREE.CatmullRomCurve3
-  mw: number
-  load: number
-  colour: THREE.Color
-}
-
-const MAX_PARTICLES = 720
-const PER_FLOW = (mw: number) => Math.min(48, Math.ceil(mw / 55))
-
-function arc(
-  from: [number, number, number],
-  to: [number, number, number],
-  rise: number
-) {
-  const mid: [number, number, number] = [
-    (from[0] + to[0]) / 2,
-    Math.max(from[1], to[1]) + rise,
-    (from[2] + to[2]) / 2,
-  ]
-  return new THREE.CatmullRomCurve3(
-    [
-      new THREE.Vector3(...from),
-      new THREE.Vector3(...mid),
-      new THREE.Vector3(...to),
-    ],
-    false,
-    "catmullrom",
-    0.6
-  )
-}
-
-function buildFlows(
-  now: Period,
-  fuelHex: Record<Series, string>,
-  theme: SceneTheme
-): Flow[] {
-  const flows: Flow[] = []
-  const nodeTotal = new Map<NodeId, { mw: number; capacity: number }>()
-
-  for (const out of now.outputs) {
-    const node = out.unit.node as NodeId
-    const t = nodeTotal.get(node) ?? { mw: 0, capacity: 0 }
-    nodeTotal.set(node, {
-      mw: t.mw + out.mw,
-      capacity: t.capacity + out.unit.capacity,
-    })
-    if (out.mw <= 0.5) continue
-    flows.push({
-      curve: arc(
-        lift(at(UNIT_AT[out.unit.id]), 0.5),
-        lift(at(NODE_AT[node]), 0.9),
-        1.1
-      ),
-      mw: out.mw,
-      load: out.available > 0 ? out.mw / out.available : 0,
-      colour: new THREE.Color(fuelHex[out.unit.fuel as Series]),
-    })
-  }
-
-  for (const [node, t] of nodeTotal) {
-    if (t.mw <= 0.5) continue
-    flows.push({
-      curve: arc(lift(at(NODE_AT[node]), 0.9), lift(at(BUS), 1.2), 2.0),
-      mw: t.mw,
-      load: t.capacity > 0 ? t.mw / t.capacity : 0,
-      colour: new THREE.Color(theme.node),
-    })
-  }
-
-  const link = now.interconnector
-  if (Math.abs(link) > 0.5) {
-    const pylon = lift(at(LINK_AT), 2.1)
-    const away = lift(at(LINK_AWAY), 2.4)
-    const bus = lift(at(BUS), 1.2)
-    const colour = new THREE.Color(fuelHex.import)
-    const load = Math.abs(link) / INTERCONNECTOR.capacity
-    flows.push(
-      link > 0
-        ? { curve: arc(away, pylon, 0.3), mw: link, load, colour }
-        : { curve: arc(pylon, away, 0.3), mw: -link, load, colour },
-      link > 0
-        ? { curve: arc(pylon, bus, 2.2), mw: link, load, colour }
-        : { curve: arc(bus, pylon, 2.2), mw: -link, load, colour }
-    )
-  }
-  return flows
-}
-
-function Flows({ flows, theme }: { flows: Flow[]; theme: SceneTheme }) {
-  const mesh = useRef<THREE.InstancedMesh>(null)
-  const dummy = useMemo(() => new THREE.Object3D(), [])
-  const clock = useRef(0)
-
-  // Per-flow particle offsets, stable across frames so a change of load does not reshuffle.
-  const plan = useMemo(() => {
-    const out: { flow: Flow; start: number; n: number }[] = []
-    let start = 0
-    for (const flow of flows) {
-      const n = Math.max(0, Math.min(PER_FLOW(flow.mw), MAX_PARTICLES - start))
-      out.push({ flow, start, n })
-      start += n
-    }
-    return out
-  }, [flows])
-
-  useEffect(() => {
-    const m = mesh.current
-    if (!m) return
-    for (const { flow, start, n } of plan) {
-      for (let i = 0; i < n; i++) m.setColorAt(start + i, flow.colour)
-    }
-    if (m.instanceColor) m.instanceColor.needsUpdate = true
-  }, [plan])
-
-  useFrame((_, delta) => {
-    const m = mesh.current
-    if (!m) return
-    clock.current += delta
-    let used = 0
-    for (const { flow, start, n } of plan) {
-      const speed = 0.12 + flow.load * 0.55 // curve lengths per second
-      const size = 0.035 + flow.load * 0.03
-      for (let i = 0; i < n; i++) {
-        const t = (clock.current * speed + i / n) % 1
-        const p = flow.curve.getPointAt(t)
-        dummy.position.copy(p)
-        dummy.scale.setScalar(size)
-        dummy.updateMatrix()
-        m.setMatrixAt(start + i, dummy.matrix)
-      }
-      used = start + n
-    }
-    dummy.scale.setScalar(0)
-    dummy.updateMatrix()
-    for (let i = used; i < MAX_PARTICLES; i++) m.setMatrixAt(i, dummy.matrix)
-    m.instanceMatrix.needsUpdate = true
-  })
-
-  return (
-    <>
-      {flows.map((flow, i) => (
-        <Line
-          key={i}
-          points={flow.curve.getPoints(32)}
-          color={theme.track}
-          lineWidth={1}
-          transparent
-          opacity={0.55}
-        />
-      ))}
-      <instancedMesh
-        ref={mesh}
-        args={[undefined, undefined, MAX_PARTICLES]}
-        frustumCulled={false}
-      >
-        <sphereGeometry args={[1, 10, 8]} />
-        <meshStandardMaterial
-          emissive="#ffffff"
-          emissiveIntensity={0.9}
-          toneMapped={false}
-          roughness={0.3}
-        />
-      </instancedMesh>
-    </>
-  )
-}
-
-/* ---------- Labels ---------------------------------------------------------------------- */
 
 /**
- * Labels are ordinary DOM, drawn beside the canvas and moved by a projector each frame. drei's
- * Html component does the same job with a React root per label in a portal, and on React 19
- * that root tears down a node the parent has already removed when the page is left — a
- * `removeChild` error on every navigation away from the overview. Nothing here is portalled,
- * so nothing is removed twice.
+ * How the board sits in the canvas: zoomed to fit what is left of it once the instruments
+ * overlap its foot on a wide screen, and nudged right, clear of the page title, so the region
+ * is framed rather than centred. Shifts are in pixels, turned into a move of the target along
+ * the camera's own right and up.
  */
-type LabelSpec = { id: string; at: [number, number, number]; node: ReactNode }
-type LabelRefs = React.RefObject<
-  Map<string, { at: THREE.Vector3; el: HTMLElement | null }>
->
+function useFraming() {
+  const size = useThree((s) => s.size)
+  const wide = size.width >= 900
+  const inset = wide ? 96 : 0
+  const zoom = Math.min(size.width / 33, (size.height - inset) / 18.5)
+  const right = wide ? size.width * 0.04 : 0
+  const up = inset / 2
+  const elevation = Math.PI / 2 - POLAR
+  const target = TARGET.clone()
+    .add(
+      new THREE.Vector3(
+        Math.cos(AZIMUTH),
+        0,
+        -Math.sin(AZIMUTH)
+      ).multiplyScalar(-right / zoom)
+    )
+    .add(
+      new THREE.Vector3(Math.sin(AZIMUTH), 0, Math.cos(AZIMUTH)).multiplyScalar(
+        up / (zoom * Math.sin(elevation))
+      )
+    )
+  return { zoom, target }
+}
 
-/** Where a plant's label hangs: above whatever the plant's body is. */
-function labelHeight(unit: Unit) {
-  const s = sizeOf(unit)
+/** An orthographic camera at the board's fixed isometric angle. */
+function Camera() {
+  const { zoom, target } = useFraming()
+  const r = 60
+  const position: [number, number, number] = [
+    target.x + r * Math.sin(POLAR) * Math.sin(AZIMUTH),
+    target.y + r * Math.cos(POLAR),
+    target.z + r * Math.sin(POLAR) * Math.cos(AZIMUTH),
+  ]
   return (
-    (unit.fuel === "wind"
-      ? s * 2.2 + 1.3
-      : unit.fuel === "solar"
-        ? 0.9
-        : s * 1.9) + 0.35
+    <OrthographicCamera
+      makeDefault
+      position={position}
+      zoom={zoom}
+      near={1}
+      far={200}
+    />
   )
 }
 
-function Projector({ refs }: { refs: LabelRefs }) {
-  const v = useMemo(() => new THREE.Vector3(), [])
-  useFrame(({ camera, size }) => {
-    for (const { at, el } of refs.current.values()) {
-      if (!el) continue
-      v.copy(at).project(camera)
-      const x = ((v.x + 1) / 2) * size.width
-      const y = ((1 - v.y) / 2) * size.height
-      const visible =
-        v.z < 1 &&
-        x > -80 &&
-        x < size.width + 80 &&
-        y > -40 &&
-        y < size.height + 40
-      el.style.transform = `translate3d(${x.toFixed(1)}px, ${y.toFixed(1)}px, 0) translate(-50%, -100%)`
-      el.style.opacity = visible ? "1" : "0"
-      el.style.pointerEvents = visible ? "" : "none"
-    }
+/**
+ * A slow sway about the board while nobody is touching it, so the scene is never a still. It
+ * sways about wherever the visitor left it, starting three seconds after they let go.
+ */
+function Controls({ reduced }: { reduced: boolean }) {
+  const controls = useRef<OrbitControlsImpl>(null)
+  const sway = useRef({ base: AZIMUTH, since: 0, touching: false })
+  const clock = useThree((s) => s.clock)
+  const { zoom: fit, target } = useFraming()
+  useFrame(() => {
+    const c = controls.current
+    const s = sway.current
+    if (!c || reduced || s.touching) return
+    const t = clock.elapsedTime - s.since - 3
+    if (t > 0) c.setAzimuthalAngle(s.base + Math.sin(t * 0.11) * 0.16)
+  })
+  return (
+    <OrbitControls
+      ref={controls}
+      makeDefault
+      target={target}
+      enablePan={false}
+      enableDamping
+      dampingFactor={0.08}
+      minZoom={fit * 0.85}
+      maxZoom={fit * 2.6}
+      minPolarAngle={0.7}
+      maxPolarAngle={1.15}
+      minAzimuthAngle={AZIMUTH - 0.75}
+      maxAzimuthAngle={AZIMUTH + 0.75}
+      onStart={() => (sway.current.touching = true)}
+      onEnd={() => {
+        const c = controls.current
+        sway.current = {
+          base: c ? c.getAzimuthalAngle() : AZIMUTH,
+          since: clock.elapsedTime,
+          touching: false,
+        }
+      }}
+    />
+  )
+}
+
+/** Calls back once the first frames have been drawn, so the page can swap the poster out. */
+function Ready({ onReady }: { onReady?: () => void }) {
+  const frames = useRef(0)
+  useFrame(() => {
+    frames.current += 1
+    if (frames.current === 3) onReady?.()
   })
   return null
 }
 
-function SceneLabels({
-  labels,
-  refs,
+function Region({
+  hovered,
+  setHovered,
 }: {
-  labels: LabelSpec[]
-  refs: LabelRefs
+  hovered: string | null
+  setHovered: (id: string | null) => void
 }) {
-  return (
-    <div className="pointer-events-none absolute inset-0 overflow-hidden">
-      {labels.map((label) => (
-        <div
-          key={label.id}
-          ref={(el) => {
-            refs.current.set(label.id, {
-              at: new THREE.Vector3(...label.at),
-              el,
-            })
-          }}
-          className="absolute top-0 left-0 will-change-transform"
-          style={{ opacity: 0 }}
-        >
-          {label.node}
-        </div>
-      ))}
-    </div>
-  )
-}
-
-/* ---------- Scene --------------------------------------------------------------------- */
-
-function Region({ labelRefs }: { labelRefs: LabelRefs }) {
   const { now, offline, toggle, period, periods } = useGrid()
   const theme = useSceneTheme()
   const fuelHex = useFuelHex()
-  const reduced = useReducedMotion()
-
-  const peakDemand = Math.max(...periods.map((p) => p.demand))
-  const flows = useMemo(
-    () => buildFlows(now, fuelHex, theme),
-    [now, fuelHex, theme]
+  const materials = useMaterials(theme)
+  const dark = useDark()
+  const reduced = useReducedMotion() ?? false
+  const d = daylight(period)
+  const peak = Math.max(...periods.map((p) => p.demand))
+  const cables = useMemo(
+    () => buildCables(now, fuelHex, theme.structure),
+    [now, fuelHex, theme.structure]
   )
-  const sun = sunFor(period)
 
-  const nodeTotals = (Object.keys(NODES) as NodeId[]).map((id) => {
-    const units = UNITS.filter((u) => u.node === id)
-    const mw = now.outputs
-      .filter((o) => o.unit.node === id)
-      .reduce((s, o) => s + o.mw, 0)
-    return { id, mw, capacity: units.reduce((s, u) => s + u.capacity, 0) }
-  })
+  const nodeLoad = (id: NodeId) => {
+    const outs = now.outputs.filter((o) => o.unit.node === id)
+    const cap = outs.reduce((s, o) => s + o.unit.capacity, 0)
+    return cap > 0 ? outs.reduce((s, o) => s + Math.max(0, o.mw), 0) / cap : 0
+  }
+
+  useEffect(() => {
+    document.body.style.cursor = hovered ? "pointer" : ""
+    return () => void (document.body.style.cursor = "")
+  }, [hovered])
 
   return (
     <>
-      <fog attach="fog" args={[theme.fog, 24, 54]} />
-      <Sky period={period} theme={theme} />
-      <Terrain theme={theme} />
+      <Lights period={period} theme={theme} dark={dark} />
+      <Board theme={theme} />
       <City
-        demand={now.demand}
-        peak={peakDemand}
-        night={sun.night}
+        structure={materials.structure}
+        load={now.demand / peak}
+        night={d.night}
         theme={theme}
       />
-
-      {nodeTotals.map((n) => (
-        <Node
-          key={n.id}
-          id={n.id}
-          mw={n.mw}
-          capacity={n.capacity}
+      {(Object.keys(NODES) as NodeId[]).map((id) => (
+        <Substation
+          key={id}
+          id={id}
+          load={nodeLoad(id)}
+          materials={materials}
           theme={theme}
         />
       ))}
-
       {now.outputs.map((out) => (
         <Plant
           key={out.unit.id}
@@ -766,98 +309,54 @@ function Region({ labelRefs }: { labelRefs: LabelRefs }) {
           out={out}
           colour={fuelHex[out.unit.fuel as Series]}
           offline={offline.includes(out.unit.id)}
+          hovered={hovered === out.unit.id}
+          materials={materials}
+          glow={dark ? 1 : 0.35}
           onToggle={() => toggle(out.unit.id)}
-          theme={theme}
+          onHover={(on) => setHovered(on ? out.unit.id : null)}
         />
       ))}
-
-      <Pylon theme={theme} />
-      <Flows flows={flows} theme={theme} />
-      <Projector refs={labelRefs} />
-
-      <OrbitControls
-        makeDefault
-        enablePan={false}
-        enableDamping
-        dampingFactor={0.08}
-        minDistance={14}
-        maxDistance={60}
-        minPolarAngle={0.35}
-        maxPolarAngle={1.22}
-        autoRotate={!reduced}
-        autoRotateSpeed={0.3}
-        target={[0.6, 0.3, 2.4]}
-      />
+      <Pylons material={materials.structure} />
+      <Cables cables={cables} theme={theme} boost={dark ? 2.2 : 1} />
+      <Controls reduced={reduced} />
     </>
   )
 }
 
-/**
- * A camera that knows the shape of its viewport. A phone's portrait frame shows a third of the
- * width a desktop does at the same distance, so the rig pulls back and widens the lens.
- */
-function CameraRig() {
-  const size = useThree((s) => s.size)
-  const aspect = size.width / size.height
-  const portrait = aspect < 0.9
-  const fov = portrait ? 50 : aspect < 1.4 ? 42 : 36
-  const d = portrait ? 31 : aspect < 1.4 ? 33 : 30
-  return (
-    <PerspectiveCamera
-      makeDefault
-      fov={fov}
-      near={0.5}
-      far={160}
-      position={portrait ? [1.5, d * 0.8, d * 0.6] : [2.5, d * 0.56, d * 0.84]}
-    />
-  )
-}
-
-const HAS_WEBGL = (() => {
-  try {
-    const c = document.createElement("canvas")
-    return !!(c.getContext("webgl2") || c.getContext("webgl"))
-  } catch {
-    return false
-  }
-})()
-
-export function RegionScene({ fallback }: { fallback: ReactNode }) {
+export function RegionScene({ onReady }: { onReady?: () => void }) {
   const { now, offline, toggle } = useGrid()
+  const dark = useDark()
   const fuelHex = useFuelHex()
+  const [hovered, setHovered] = useState<string | null>(null)
   const labelRefs = useRef(
     new Map<string, { at: THREE.Vector3; el: HTMLElement | null }>()
   )
-  if (!HAS_WEBGL) return <>{fallback}</>
-
-  const nodeTotals = (Object.keys(NODES) as NodeId[]).map((id) => ({
-    id,
-    mw: now.outputs
-      .filter((o) => o.unit.node === id)
-      .reduce((s, o) => s + o.mw, 0),
-  }))
-  const importing = now.interconnector >= 0
 
   const labels: LabelSpec[] = [
     ...now.outputs.map((out) => {
       const unit = out.unit
       const isOff = offline.includes(unit.id)
-      const colour = fuelHex[unit.fuel as Series]
+      const [x, z] = UNIT_AT[unit.id]
       return {
         id: `u-${unit.id}`,
-        at: lift(at(UNIT_AT[unit.id]), labelHeight(unit)),
+        at: [x, labelHeight(unit), z] as [number, number, number],
         node: (
           <button
             type="button"
             onClick={() => toggle(unit.id)}
+            onPointerEnter={() => setHovered(unit.id)}
+            onPointerLeave={() => setHovered(null)}
             aria-pressed={isOff}
             aria-label={`${unit.name}, ${Math.round(out.mw)} of ${unit.capacity} megawatts${isOff ? ", offline" : ""}`}
-            className="pointer-events-auto glass hidden items-baseline gap-1.5 rounded-full px-2.5 py-1 figure text-[11px] leading-none whitespace-nowrap text-foreground select-none hover:border-ring/60 focus-visible:outline-2 focus-visible:outline-ring sm:flex"
+            className={`pointer-events-auto glass hidden items-baseline gap-1.5 rounded-full px-2 py-1 figure text-[10.5px] leading-none whitespace-nowrap text-foreground transition-[border-color,transform] select-none hover:border-ring/70 focus-visible:outline-2 focus-visible:outline-ring sm:flex ${hovered === unit.id ? "scale-110 border-ring/70" : ""}`}
           >
             <span
               aria-hidden="true"
               className="inline-block size-1.5 rounded-full"
-              style={{ backgroundColor: colour, opacity: isOff ? 0.3 : 1 }}
+              style={{
+                backgroundColor: fuelHex[unit.fuel as Series],
+                opacity: isOff ? 0.3 : 1,
+              }}
             />
             <span className={isOff ? "line-through opacity-60" : ""}>
               {unit.name}
@@ -867,21 +366,13 @@ export function RegionScene({ fallback }: { fallback: ReactNode }) {
         ),
       }
     }),
-    ...nodeTotals.map((n) => ({
-      id: `n-${n.id}`,
-      at: lift(at(NODE_AT[n.id]), 1.75),
-      node: (
-        <span className="label whitespace-nowrap text-foreground/90">
-          {NODES[n.id].name} · {Math.round(n.mw).toLocaleString("en-GB")}
-        </span>
-      ),
-    })),
     {
       id: "link",
-      at: lift(at(LINK_AT), 3),
+      at: [LINK_FAR[0], 3.0, LINK_FAR[1]],
       node: (
-        <span className="label whitespace-nowrap text-foreground/90">
-          {INTERCONNECTOR.name} · {importing ? "↓" : "↑"}{" "}
+        <span className="label whitespace-nowrap text-foreground/80">
+          {INTERCONNECTOR.name} ·{" "}
+          {now.interconnector >= 0 ? "importing" : "exporting"}{" "}
           {Math.abs(Math.round(now.interconnector)).toLocaleString("en-GB")}
         </span>
       ),
@@ -889,12 +380,15 @@ export function RegionScene({ fallback }: { fallback: ReactNode }) {
   ]
 
   return (
-    <div
-      className="absolute inset-0"
-      role="img"
-      aria-label={`The region in three dimensions. Demand ${Math.round(now.demand)} megawatts; plants lit by their output, power moving along the lines to the city.`}
-    >
+    <div className="absolute inset-0">
+      <p className="sr-only">
+        The region as a model: plants glow with their output and light moves
+        along the cables to the city. Demand is{" "}
+        {Math.round(now.demand).toLocaleString("en-GB")} megawatts. Each plant's
+        label below takes it out of service.
+      </p>
       <Canvas
+        aria-hidden="true"
         dpr={[1, 1.6]}
         shadows
         gl={{
@@ -904,11 +398,33 @@ export function RegionScene({ fallback }: { fallback: ReactNode }) {
         }}
         onCreated={({ gl }) => gl.setClearColor(0x000000, 0)}
         style={{ touchAction: "pan-y" }}
+        onPointerMissed={() => setHovered(null)}
       >
-        <CameraRig />
-        <Region labelRefs={labelRefs} />
+        <Camera />
+        <Region hovered={hovered} setHovered={setHovered} />
+        <Projector refs={labelRefs} />
+        {/*
+         * Only what is brighter than white blooms: the accents and the pulses, which are drawn
+         * unclamped. The structure and the board stay crisp.
+         */}
+        {dark ? (
+          <EffectComposer multisampling={4}>
+            <Bloom
+              mipmapBlur
+              luminanceThreshold={1}
+              luminanceSmoothing={0.2}
+              intensity={0.9}
+              radius={0.6}
+            />
+          </EffectComposer>
+        ) : null}
+        <Ready onReady={onReady} />
       </Canvas>
-      <SceneLabels labels={labels} refs={labelRefs} />
+      <SceneLabels
+        labels={labels}
+        refs={labelRefs}
+        name="Plants in the region"
+      />
     </div>
   )
 }

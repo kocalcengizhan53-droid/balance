@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import {
   Factory,
   LayoutDashboard,
@@ -50,17 +50,6 @@ export function CommandMenu({
   const { units, offline, toggle, restore, playing, setPlaying, setPeriod } =
     useGrid()
   const [query, setQuery] = useState("")
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
-        e.preventDefault()
-        onOpenChange(!open)
-      }
-    }
-    window.addEventListener("keydown", onKey)
-    return () => window.removeEventListener("keydown", onKey)
-  }, [open, onOpenChange])
 
   const run = (fn: () => void) => () => {
     fn()

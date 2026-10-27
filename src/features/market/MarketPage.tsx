@@ -180,7 +180,7 @@ export function MarketPage() {
                     ) : (
                       <Badge
                         variant="outline"
-                        className="border-fuel-biomass/40 text-fuel-biomass"
+                        className="border-fuel-biomass/40 text-[color-mix(in_oklab,var(--fuel-biomass)_70%,black)] dark:text-fuel-biomass"
                       >
                         balanced
                       </Badge>

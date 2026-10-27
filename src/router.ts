@@ -1,19 +1,38 @@
 import { createBrowserRouter } from "react-router"
 
-import { FleetPage } from "@/features/fleet/FleetPage"
 import { AppLayout } from "@/features/layout/AppLayout"
-import { MarketPage } from "@/features/market/MarketPage"
+import { NotFoundPage } from "@/features/layout/NotFoundPage"
 import { OverviewPage } from "@/features/overview/OverviewPage"
-import { ScenariosPage } from "@/features/scenarios/ScenariosPage"
 
+/*
+ * The overview is the landing page and ships with the app; the other pages load when they are
+ * first visited, so a phone opening the overview downloads the overview.
+ */
 export const router = createBrowserRouter([
   {
     Component: AppLayout,
     children: [
       { index: true, Component: OverviewPage },
-      { path: "fleet", Component: FleetPage },
-      { path: "market", Component: MarketPage },
-      { path: "scenarios", Component: ScenariosPage },
+      {
+        path: "fleet",
+        lazy: async () => ({
+          Component: (await import("@/features/fleet/FleetPage")).FleetPage,
+        }),
+      },
+      {
+        path: "market",
+        lazy: async () => ({
+          Component: (await import("@/features/market/MarketPage")).MarketPage,
+        }),
+      },
+      {
+        path: "scenarios",
+        lazy: async () => ({
+          Component: (await import("@/features/scenarios/ScenariosPage"))
+            .ScenariosPage,
+        }),
+      },
+      { path: "*", Component: NotFoundPage },
     ],
   },
 ])

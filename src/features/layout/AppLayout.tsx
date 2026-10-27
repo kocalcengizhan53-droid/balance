@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { Suspense, lazy, useEffect, useState } from "react"
 import { Pause, Play, Search } from "lucide-react"
 import { Outlet, useLocation } from "react-router"
 
@@ -20,7 +20,6 @@ import { TooltipProvider } from "@/components/ui/tooltip"
 import { useGrid } from "@/features/dashboard/useGrid"
 import { AppSidebar } from "@/features/layout/AppSidebar"
 import { PAGES } from "@/features/layout/pages"
-import { CommandMenu } from "@/features/layout/CommandMenu"
 import { ThemeToggle } from "@/features/layout/ThemeToggle"
 import { periodLabel } from "@/lib/grid/profiles"
 
@@ -30,10 +29,34 @@ import { periodLabel } from "@/lib/grid/profiles"
  * the clock and the one figure a control room is run on, system frequency — derived from the
  * solver's unserved demand, so the header says "short" the instant the model does.
  */
+// The palette (cmdk, a dialog, every command) loads the first time it is asked for.
+const CommandMenu = lazy(() =>
+  import("@/features/layout/CommandMenu").then((m) => ({
+    default: m.CommandMenu,
+  }))
+)
+
 export function AppLayout() {
   const { now, period, playing, setPlaying } = useGrid()
   const { pathname } = useLocation()
   const [palette, setPalette] = useState(false)
+  const [paletteLoaded, setPaletteLoaded] = useState(false)
+  const openPalette = (open: boolean) => {
+    if (open) setPaletteLoaded(true)
+    setPalette(open)
+  }
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault()
+        setPaletteLoaded(true)
+        setPalette((open) => !open)
+      }
+    }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [])
   const page = PAGES.find((p) =>
     p.to === "/" ? pathname === "/" : pathname.startsWith(p.to)
   )
@@ -73,7 +96,7 @@ export function AppLayout() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setPalette(true)}
+                onClick={() => openPalette(true)}
                 aria-label="Open the command palette"
                 className="hidden gap-2 text-muted-foreground lg:inline-flex"
               >
@@ -132,7 +155,11 @@ export function AppLayout() {
           </header>
           <Outlet />
         </SidebarInset>
-        <CommandMenu open={palette} onOpenChange={setPalette} />
+        {paletteLoaded ? (
+          <Suspense fallback={null}>
+            <CommandMenu open={palette} onOpenChange={openPalette} />
+          </Suspense>
+        ) : null}
       </SidebarProvider>
     </TooltipProvider>
   )

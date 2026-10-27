@@ -109,9 +109,9 @@ async function expectAgreement(page: Page) {
   )
 
   // The diagram says the same thing in its accessible name, which is what a screen reader
-  // is handed in place of the drawing.
+  // is handed before it walks the unit rows inside it.
   await expect(
-    page.getByRole("img", { name: /single-line diagram/ }).last()
+    page.getByRole("group", { name: /single-line diagram/ }).last()
   ).toHaveAttribute(
     "aria-label",
     new RegExp(`Demand ${Math.round(s.demand)} megawatts`)

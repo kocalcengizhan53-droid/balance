@@ -142,7 +142,8 @@ export function Schematic({
         <svg
           viewBox={`0 0 ${W} ${H}`}
           className="mx-auto block w-full max-w-[72rem] min-w-[54rem]"
-          role="img"
+          // A group, not an image: its unit rows are buttons, and an image cannot contain controls.
+          role="group"
           aria-label={`System single-line diagram. ${groups
             .map((g) => `${g.name} ${Math.round(g.mw)} megawatts`)
             .join(
