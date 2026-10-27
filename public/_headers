@@ -1,0 +1,4 @@
+# https://developers.cloudflare.com/pages/configuration/headers/
+# Vite names every built file by its content hash, so a returning visitor never needs to ask again.
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
