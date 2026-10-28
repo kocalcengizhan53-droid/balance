@@ -11,7 +11,14 @@ import {
   type SortingState,
   type VisibilityState,
 } from "@tanstack/react-table"
-import { ChevronLeft, ChevronRight, Search, Settings2 } from "lucide-react"
+import {
+  ChevronLeft,
+  ChevronRight,
+  LayoutGrid,
+  Rows3,
+  Search,
+  Settings2,
+} from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -39,7 +46,9 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { useGrid } from "@/features/dashboard/useGrid"
+import { FleetCards } from "@/features/fleet/FleetCards"
 import { UnitSheet } from "@/features/fleet/UnitSheet"
 import { ExportCsvButton } from "@/features/session/ExportCsvButton"
 import { unitStatus, type UnitStatus } from "@/lib/grid/analysis"
@@ -62,7 +71,9 @@ export function FleetPage() {
   // TanStack Table v8 keeps its own mutable state inside the table object; the compiler's
   // memoisation would hide its updates, so this component opts out.
   "use no memo"
-  const { units, now, period, offline, toggle, restore, scenario } = useGrid()
+  const { units, now, period, periods, offline, toggle, restore, scenario } =
+    useGrid()
+  const [view, setView] = useState<"cards" | "table">("cards")
   const [tab, setTab] = useState<"all" | UnitStatus>("all")
   const [sorting, setSorting] = useState<SortingState>([
     { id: "output", desc: true },
@@ -140,7 +151,7 @@ export function FleetPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Fleet</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Eleven units at {periodLabel(period)}. Press a row for the detail;
+            Eleven units at {periodLabel(period)}. Press a unit for the detail;
             take a unit out and the day re-solves.
           </p>
         </div>
@@ -176,6 +187,23 @@ export function FleetPage() {
             </TabsList>
           </Tabs>
           <div className="ml-auto flex flex-wrap items-center gap-2">
+            <ToggleGroup
+              value={[view]}
+              onValueChange={(v) => {
+                const next = (v as (typeof view)[])[0]
+                if (next) setView(next)
+              }}
+              variant="outline"
+              size="sm"
+              aria-label="View"
+            >
+              <ToggleGroupItem value="cards" className="px-2.5 text-xs">
+                <LayoutGrid aria-hidden="true" /> Cards
+              </ToggleGroupItem>
+              <ToggleGroupItem value="table" className="px-2.5 text-xs">
+                <Rows3 aria-hidden="true" /> Table
+              </ToggleGroupItem>
+            </ToggleGroup>
             <label className="relative">
               <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
               <Input
@@ -248,31 +276,33 @@ export function FleetPage() {
                 ]),
               ]}
             />
-            <DropdownMenu>
-              <DropdownMenuTrigger
-                render={<Button variant="outline" size="sm" />}
-              >
-                <Settings2 /> Columns
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuGroup>
-                  <DropdownMenuLabel>Show</DropdownMenuLabel>
-                  {table
-                    .getAllLeafColumns()
-                    .filter((c) => c.getCanHide())
-                    .map((c) => (
-                      <DropdownMenuCheckboxItem
-                        key={c.id}
-                        checked={c.getIsVisible()}
-                        onCheckedChange={(on) => c.toggleVisibility(!!on)}
-                      >
-                        {metaOf(c).label ??
-                          c.id[0].toUpperCase() + c.id.slice(1)}
-                      </DropdownMenuCheckboxItem>
-                    ))}
-                </DropdownMenuGroup>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            {view === "table" ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger
+                  render={<Button variant="outline" size="sm" />}
+                >
+                  <Settings2 /> Columns
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuGroup>
+                    <DropdownMenuLabel>Show</DropdownMenuLabel>
+                    {table
+                      .getAllLeafColumns()
+                      .filter((c) => c.getCanHide())
+                      .map((c) => (
+                        <DropdownMenuCheckboxItem
+                          key={c.id}
+                          checked={c.getIsVisible()}
+                          onCheckedChange={(on) => c.toggleVisibility(!!on)}
+                        >
+                          {metaOf(c).label ??
+                            c.id[0].toUpperCase() + c.id.slice(1)}
+                        </DropdownMenuCheckboxItem>
+                      ))}
+                  </DropdownMenuGroup>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : null}
           </div>
         </div>
 
@@ -309,115 +339,134 @@ export function FleetPage() {
           </div>
         ) : null}
 
-        <Table>
-          <TableHeader>
-            {table.getHeaderGroups().map((group) => (
-              <TableRow key={group.id} className="text-xs">
-                {group.headers.map((header) => {
-                  const meta = metaOf(header.column)
-                  const dir = header.column.getIsSorted()
-                  return (
-                    <TableHead
-                      key={header.id}
-                      aria-sort={
-                        dir === "asc"
-                          ? "ascending"
-                          : dir === "desc"
-                            ? "descending"
-                            : undefined
-                      }
-                      className={
-                        header.id === "select" || header.id === "actions"
-                          ? "w-10"
-                          : meta.numeric
-                            ? "text-right"
-                            : ""
-                      }
-                    >
-                      {header.isPlaceholder || !header.column.columnDef.header
-                        ? null
-                        : typeof header.column.columnDef.header === "function"
-                          ? header.column.columnDef.header(header.getContext())
-                          : header.column.columnDef.header}
-                    </TableHead>
-                  )
-                })}
-              </TableRow>
-            ))}
-          </TableHeader>
-          <TableBody>
-            {table.getRowModel().rows.map((row) => (
-              <TableRow
-                key={row.id}
-                data-state={row.getIsSelected() ? "selected" : undefined}
-                className={`cursor-pointer ${row.original.status === "offline" ? "opacity-60" : ""}`}
-                onClick={() => setOpen(row.original.unit.id)}
-              >
-                {row.getVisibleCells().map((cell) => {
-                  const meta = metaOf(cell.column)
-                  const stop =
-                    cell.column.id === "select" || cell.column.id === "actions"
-                  const render = cell.column.columnDef.cell
-                  return (
+        {view === "cards" ? (
+          <FleetCards
+            rows={table.getPrePaginationRowModel().rows.map((r) => r.original)}
+            periods={periods}
+            period={period}
+            toggle={toggle}
+            openUnit={setOpen}
+          />
+        ) : (
+          <>
+            <Table>
+              <TableHeader>
+                {table.getHeaderGroups().map((group) => (
+                  <TableRow key={group.id} className="text-xs">
+                    {group.headers.map((header) => {
+                      const meta = metaOf(header.column)
+                      const dir = header.column.getIsSorted()
+                      return (
+                        <TableHead
+                          key={header.id}
+                          aria-sort={
+                            dir === "asc"
+                              ? "ascending"
+                              : dir === "desc"
+                                ? "descending"
+                                : undefined
+                          }
+                          className={
+                            header.id === "select" || header.id === "actions"
+                              ? "w-10"
+                              : meta.numeric
+                                ? "text-right"
+                                : ""
+                          }
+                        >
+                          {header.isPlaceholder ||
+                          !header.column.columnDef.header
+                            ? null
+                            : typeof header.column.columnDef.header ===
+                                "function"
+                              ? header.column.columnDef.header(
+                                  header.getContext()
+                                )
+                              : header.column.columnDef.header}
+                        </TableHead>
+                      )
+                    })}
+                  </TableRow>
+                ))}
+              </TableHeader>
+              <TableBody>
+                {table.getRowModel().rows.map((row) => (
+                  <TableRow
+                    key={row.id}
+                    data-state={row.getIsSelected() ? "selected" : undefined}
+                    className={`cursor-pointer ${row.original.status === "offline" ? "opacity-60" : ""}`}
+                    onClick={() => setOpen(row.original.unit.id)}
+                  >
+                    {row.getVisibleCells().map((cell) => {
+                      const meta = metaOf(cell.column)
+                      const stop =
+                        cell.column.id === "select" ||
+                        cell.column.id === "actions"
+                      const render = cell.column.columnDef.cell
+                      return (
+                        <TableCell
+                          key={cell.id}
+                          onClick={
+                            stop ? (e) => e.stopPropagation() : undefined
+                          }
+                          className={[
+                            meta.numeric ? "text-right figure" : "",
+                            meta.muted ? "text-muted-foreground" : "",
+                          ].join(" ")}
+                        >
+                          {typeof render === "function"
+                            ? render(cell.getContext())
+                            : null}
+                        </TableCell>
+                      )
+                    })}
+                  </TableRow>
+                ))}
+                {table.getRowModel().rows.length === 0 ? (
+                  <TableRow>
                     <TableCell
-                      key={cell.id}
-                      onClick={stop ? (e) => e.stopPropagation() : undefined}
-                      className={[
-                        meta.numeric ? "text-right figure" : "",
-                        meta.muted ? "text-muted-foreground" : "",
-                      ].join(" ")}
+                      colSpan={12}
+                      className="py-10 text-center text-sm text-muted-foreground"
                     >
-                      {typeof render === "function"
-                        ? render(cell.getContext())
-                        : null}
+                      No unit matches.
                     </TableCell>
-                  )
-                })}
-              </TableRow>
-            ))}
-            {table.getRowModel().rows.length === 0 ? (
-              <TableRow>
-                <TableCell
-                  colSpan={12}
-                  className="py-10 text-center text-sm text-muted-foreground"
-                >
-                  No unit matches.
-                </TableCell>
-              </TableRow>
-            ) : null}
-          </TableBody>
-        </Table>
+                  </TableRow>
+                ) : null}
+              </TableBody>
+            </Table>
 
-        <div className="flex items-center justify-between border-t border-border/60 px-3 py-2 text-xs text-muted-foreground">
-          <span className="figure">
-            {shown
-              ? `${pageIndex * PAGE + 1}–${Math.min(shown, (pageIndex + 1) * PAGE)} of ${shown}`
-              : "0 of 0"}
-          </span>
-          <span className="flex items-center gap-1">
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              disabled={!table.getCanPreviousPage()}
-              onClick={() => table.previousPage()}
-              aria-label="Previous page"
-            >
-              <ChevronLeft />
-            </Button>
-            <span className="figure">
-              {pageIndex + 1} / {Math.max(1, table.getPageCount())}
-            </span>
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              disabled={!table.getCanNextPage()}
-              onClick={() => table.nextPage()}
-              aria-label="Next page"
-            >
-              <ChevronRight />
-            </Button>
-          </span>
-        </div>
+            <div className="flex items-center justify-between border-t border-border/60 px-3 py-2 text-xs text-muted-foreground">
+              <span className="figure">
+                {shown
+                  ? `${pageIndex * PAGE + 1}–${Math.min(shown, (pageIndex + 1) * PAGE)} of ${shown}`
+                  : "0 of 0"}
+              </span>
+              <span className="flex items-center gap-1">
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  disabled={!table.getCanPreviousPage()}
+                  onClick={() => table.previousPage()}
+                  aria-label="Previous page"
+                >
+                  <ChevronLeft />
+                </Button>
+                <span className="figure">
+                  {pageIndex + 1} / {Math.max(1, table.getPageCount())}
+                </span>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  disabled={!table.getCanNextPage()}
+                  onClick={() => table.nextPage()}
+                  aria-label="Next page"
+                >
+                  <ChevronRight />
+                </Button>
+              </span>
+            </div>
+          </>
+        )}
       </section>
 
       <UnitSheet unitId={open} onClose={() => setOpen(null)} />

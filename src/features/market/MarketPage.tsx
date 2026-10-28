@@ -15,6 +15,7 @@ import { KpiCard } from "@/features/dashboard/KpiCard"
 import { MeritCurve } from "@/features/dashboard/MeritCurve"
 import { useGrid } from "@/features/dashboard/useGrid"
 import { DaySeriesChart } from "@/features/market/DaySeriesChart"
+import { PriceSurface } from "@/features/market/PriceSurface"
 import { dayStats } from "@/lib/grid/analysis"
 import { periodLabel } from "@/lib/grid/profiles"
 import { ExportCsvButton } from "@/features/session/ExportCsvButton"
@@ -111,6 +112,8 @@ export function MarketPage() {
           onSelect={grid.setPeriod}
         />
       </div>
+
+      <PriceSurface />
 
       <div className="grid grid-cols-[minmax(0,1fr)] gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(0,34rem)]">
         <section className="panel min-w-0">

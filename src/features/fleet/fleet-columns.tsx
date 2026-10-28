@@ -25,7 +25,7 @@ export type Row = {
   cost: number
 }
 
-const STATUS_TONE: Record<UnitStatus, string> = {
+export const STATUS_TONE: Record<UnitStatus, string> = {
   running: "text-fuel-biomass border-fuel-biomass/40",
   constrained: "text-live border-live/40",
   idle: "text-muted-foreground",

@@ -4,6 +4,8 @@ A grid control room for a region that does not exist, solved half-hourly: an iso
 
 **Live:** <https://balance-dispatch.pages.dev>
 
+**For your product:** the same build for your SaaS admin panel, ops console or analytics dashboard — live KPIs, charts you can press, a table that filters and exports, sign-in with roles and an audit log, every number traced to one model of your data.
+
 ![Overview: the region as a model on a table — plants glowing with their load, light running along the cables, the city lit at dusk — over the KPI cards and the levers](docs/dashboard.webp)
 
 ## In three seconds
@@ -11,6 +13,7 @@ A grid control room for a region that does not exist, solved half-hourly: an iso
 - **Press a plant to take it out** and watch the power re-route: the cables dim and brighten, the link across the strait picks up, the price and the carbon move — on every page at once.
 - **Pull three levers** (carbon price, demand, wind) or press a preset, and every figure is re-solved against the baseline. The state lives in the URL, so a scenario is a link.
 - **Sign in as an operator** and re-declare a plant's capacity, minimum stable output or cost: the day re-solves on every page, the server checks the figures, and an audit log records who changed what. Viewers read and export any table as CSV. Each visitor gets a private sandbox for 24 hours.
+- **Three more views of the same solve:** where the power goes as a Sankey whose ribbons keep their fuel's colour from plant to demand; a price surface that re-solves the whole day across a lever's range (press a cell to go there); and the fleet as a wall of gauges with each unit's day traced under it.
 - **One model, proven in the browser:** a merit-order dispatch with minimum stable generation, ramp rates and unit commitment; the browser suite re-solves the day and compares it with the text actually painted. Lighthouse mobile **89–90** on all four pages, accessibility 100.
 
 ---

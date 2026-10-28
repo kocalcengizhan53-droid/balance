@@ -286,6 +286,10 @@
   --fuel-gas: #eb6834;
   --fuel-battery: #6250d6;
   --fuel-import: #e34948;
+
+  /* The price surface: one hue, pale to deep, so cheap reads as quiet and dear as loud. */
+  --heat-lo: oklch(0.955 0.03 82);
+  --heat-hi: oklch(0.58 0.17 48);
 }
 
 .dark {
@@ -307,6 +311,10 @@
   --fuel-gas: #d95926;
   --fuel-battery: #9085e9;
   --fuel-import: #e66767;
+
+  /* The same hue run the other way: on the dark surface, dear is the bright end. */
+  --heat-lo: oklch(0.29 0.045 70);
+  --heat-hi: oklch(0.88 0.15 84);
 }
 
 @theme inline {
@@ -340,5 +348,23 @@
   .flow,
   .led {
     animation: none;
+  }
+}
+
+/* Power along a Sankey ribbon: sparse beads, a beat faster than the network's dashes. */
+@keyframes stream {
+  to {
+    stroke-dashoffset: -14;
+  }
+}
+
+.stream {
+  animation: stream 0.7s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stream {
+    animation: none;
+    opacity: 0;
   }
 }

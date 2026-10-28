@@ -26,6 +26,9 @@ async function toPage(
     await page.getByRole("button", { name: /toggle sidebar/i }).click()
   await page.getByRole("link", { name, exact: true }).first().click()
   await page.getByRole("heading", { level: 1, name }).waitFor()
+  // The fleet opens on its cards; these checks read the table.
+  if (name === "Fleet")
+    await page.getByRole("button", { name: "Table", exact: true }).click()
 }
 
 /** The single-line diagram: the one place a unit's control stands still. */

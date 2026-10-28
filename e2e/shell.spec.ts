@@ -61,6 +61,7 @@ test("the fleet table filters, sorts, hides columns, selects, and opens a drawer
   page,
 }) => {
   await page.goto("/fleet")
+  await page.getByRole("button", { name: "Table", exact: true }).click()
   await expect(page.getByRole("row")).toHaveCount(9) // header + 8 on the first page
   await page.getByRole("button", { name: "Next page" }).click()
   await expect(page.getByRole("row")).toHaveCount(4)

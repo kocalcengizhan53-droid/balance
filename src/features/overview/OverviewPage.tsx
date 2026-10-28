@@ -7,6 +7,7 @@ import { ScenarioPanel } from "@/features/dashboard/ScenarioPanel"
 import { Schematic } from "@/features/dashboard/Schematic"
 import { useGrid } from "@/features/dashboard/useGrid"
 import { EventsFeed } from "@/features/overview/EventsFeed"
+import { FlowSankey } from "@/features/overview/FlowSankey"
 import { FrequencyPanel } from "@/features/overview/FrequencyPanel"
 import { MixRing } from "@/features/overview/MixRing"
 import { SceneStage } from "@/features/overview/SceneStage"
@@ -162,6 +163,8 @@ export function OverviewPage() {
         <FrequencyPanel />
         <MixRing />
       </div>
+
+      <FlowSankey />
 
       <DispatchChart
         periods={periods}

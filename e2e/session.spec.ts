@@ -35,6 +35,7 @@ test("an operator re-declares a unit; the fleet and the audit log follow", async
 }, info) => {
   const mobile = info.project.name === "mobile"
   await page.goto("/fleet")
+  await page.getByRole("button", { name: "Table", exact: true }).click()
   await signIn(page, "Deniz A.", "Operator", mobile)
 
   await calder(page).click()
@@ -64,6 +65,7 @@ test("a viewer reads and exports, cannot edit, and the download is logged", asyn
 }, info) => {
   const mobile = info.project.name === "mobile"
   await page.goto("/fleet")
+  await page.getByRole("button", { name: "Table", exact: true }).click()
   await signIn(page, "Jun P.", "Viewer", mobile)
 
   await calder(page).click()
@@ -79,7 +81,10 @@ test("a viewer reads and exports, cannot edit, and the download is logged", asyn
     page.waitForEvent("download"),
     page.getByRole("button", { name: "Export CSV" }).click(),
   ])
-  const csv = readFileSync((await download.path())!, "utf8").replace(/^\uFEFF/, "")
+  const csv = readFileSync((await download.path())!, "utf8").replace(
+    /^\uFEFF/,
+    ""
+  )
   const rows = csv.trim().split("\r\n")
   expect(rows[0]).toBe(
     "Unit,Fuel,Status,Output MW,Available MW,Capacity MW,Minimum stable MW,Marginal cost £/MWh,Carbon gCO2/kWh,Node"
