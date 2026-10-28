@@ -1,4 +1,3 @@
-import { motion, useReducedMotion } from "motion/react"
 import {
   ArrowLeftRight,
   Atom,
@@ -57,8 +56,6 @@ export function FleetCards({
   toggle: (id: string) => void
   openUnit: (id: string) => void
 }) {
-  const reduced = useReducedMotion()
-
   if (!rows.length)
     return (
       <p className="px-4 py-10 text-center text-sm text-muted-foreground">
@@ -85,14 +82,9 @@ export function FleetCards({
         const tick = Math.PI * (1 - availShare)
 
         return (
-          <motion.li
+          <li
             key={r.unit.id}
-            layout={!reduced}
-            // No entrance fade: a card's figure is the page's largest paint, and a paint
-            // that starts at opacity 0 is counted when the fade ends, not when it begins.
-            initial={false}
-            animate={{ opacity: offline ? 0.62 : 1 }}
-            transition={{ duration: 0.4 }}
+            style={{ opacity: offline ? 0.62 : 1 }}
             className="group relative"
           >
             <div
@@ -200,13 +192,12 @@ export function FleetCards({
                   strokeWidth={1.5}
                   strokeLinejoin="round"
                 />
-                <motion.circle
-                  initial={false}
-                  animate={{ cx: sx(period), cy: sy(series[period]) }}
-                  transition={{ duration: 0.25, ease: "easeOut" }}
+                <circle
+                  cx={sx(period)}
+                  cy={sy(series[period])}
                   r={3}
                   fill={fuelVar(fuel)}
-                  className="stroke-card"
+                  className="stroke-card transition-[cx,cy] duration-300 ease-out"
                   strokeWidth={1.5}
                 />
               </svg>
@@ -240,7 +231,7 @@ export function FleetCards({
                 </Button>
               </div>
             </div>
-          </motion.li>
+          </li>
         )
       })}
     </ul>
