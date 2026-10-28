@@ -40,14 +40,18 @@ export function writeUrlState({
   offline,
   period,
   scenario,
+  playing = false,
 }: {
   offline: readonly string[]
   period: number
   scenario: Scenario
+  /** A running clock is not a half-hour anyone chose: the link says it plays instead. */
+  playing?: boolean
 }) {
   const q = new URLSearchParams()
   if (offline.length) q.set("out", [...offline].sort().join(","))
-  if (period !== 36) q.set("t", String(period))
+  if (playing) q.set("play", "1")
+  else if (period !== 36) q.set("t", String(period))
   if (scenario.carbonPrice !== BASELINE.carbonPrice)
     q.set("carbon", String(scenario.carbonPrice))
   if (scenario.demandScale !== BASELINE.demandScale)

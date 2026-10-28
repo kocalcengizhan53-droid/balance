@@ -7,6 +7,8 @@ import { ScenarioPanel } from "@/features/dashboard/ScenarioPanel"
 import { Schematic } from "@/features/dashboard/Schematic"
 import { useGrid } from "@/features/dashboard/useGrid"
 import { EventsFeed } from "@/features/overview/EventsFeed"
+import { FrequencyPanel } from "@/features/overview/FrequencyPanel"
+import { MixRing } from "@/features/overview/MixRing"
 import { SceneStage } from "@/features/overview/SceneStage"
 import { periodLabel } from "@/lib/grid/profiles"
 
@@ -155,6 +157,11 @@ export function OverviewPage() {
           </motion.p>
         ) : null}
       </AnimatePresence>
+
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-3 xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
+        <FrequencyPanel />
+        <MixRing />
+      </div>
 
       <DispatchChart
         periods={periods}

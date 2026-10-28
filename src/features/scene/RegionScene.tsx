@@ -323,7 +323,43 @@ function Region({
   )
 }
 
-export function RegionScene({ onReady }: { onReady?: () => void }) {
+declare global {
+  interface Window {
+    /** Present only with `?capture`: lets the video script set the half-hour and step the clock. */
+    __scene?: {
+      setPeriod: (period: number) => void
+      step: (seconds: number) => void
+    }
+  }
+}
+
+/** Under `?capture` the scene draws only when stepped, so every frame is exactly one frame apart. */
+function CaptureClock() {
+  const advance = useThree((state) => state.advance)
+  const { setPeriod } = useGrid()
+  useEffect(() => {
+    let t = performance.now()
+    window.__scene = {
+      setPeriod,
+      step: (seconds) => {
+        t += seconds * 1000
+        advance(t)
+      },
+    }
+    return () => {
+      delete window.__scene
+    }
+  }, [advance, setPeriod])
+  return null
+}
+
+export function RegionScene({
+  onReady,
+  capture = false,
+}: {
+  onReady?: () => void
+  capture?: boolean
+}) {
   const { now, offline, toggle } = useGrid()
   const dark = useDark()
   const fuelHex = useFuelHex()
@@ -389,6 +425,7 @@ export function RegionScene({ onReady }: { onReady?: () => void }) {
       </p>
       <Canvas
         aria-hidden="true"
+        frameloop={capture ? "never" : "always"}
         dpr={[1, 1.6]}
         shadows
         gl={{
@@ -419,6 +456,7 @@ export function RegionScene({ onReady }: { onReady?: () => void }) {
           </EffectComposer>
         ) : null}
         <Ready onReady={onReady} />
+        {capture ? <CaptureClock /> : null}
       </Canvas>
       <SceneLabels
         labels={labels}

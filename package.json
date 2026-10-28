@@ -18,7 +18,8 @@
     "deploy": "npm run build && wrangler d1 migrations apply balance-db --remote && wrangler pages deploy dist --project-name=balance-dispatch --branch=main",
     "posters": "node scripts/posters.mjs",
     "qa:axe": "node qa/axe.mjs",
-    "qa:lighthouse": "node qa/lighthouse.mjs"
+    "qa:lighthouse": "node qa/lighthouse.mjs",
+    "scene-video": "node scripts/scene-video.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",

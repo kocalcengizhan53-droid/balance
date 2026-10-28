@@ -3,12 +3,14 @@ import {
   Suspense,
   lazy,
   useEffect,
+  useRef,
   useState,
   useSyncExternalStore,
   type ReactNode,
 } from "react"
 import { Box } from "lucide-react"
 
+import { TICK_MS } from "@/features/dashboard/clock"
 import { useGrid } from "@/features/dashboard/useGrid"
 import { daylight } from "@/features/scene/daylight"
 import { useDark } from "@/features/scene/palette"
@@ -17,8 +19,10 @@ import { useDark } from "@/features/scene/palette"
  * The scene is three, fiber and drei — more than the rest of the app together. It arrives in its
  * own chunk, and until it does the stage shows a picture of it: rendered from the same scene by
  * `npm run posters`, one per theme and shape. On a desktop the live scene loads once the page is
- * idle and fades in over the picture; on a phone it waits to be asked for, because a phone pays
- * for three megabytes of WebGL in battery and in the time before the page answers a tap.
+ * idle and fades in over the picture. A phone pays for three megabytes of WebGL in battery and in
+ * the time before the page answers a tap, so there the live scene waits to be asked for and the
+ * stage plays a video of the same scene through the day instead — `npm run scene-video` renders
+ * it, 0.72 s per half-hour like the clock — kept on whatever half-hour the dashboard shows.
  */
 const RegionScene = lazy(() =>
   import("@/features/scene/RegionScene").then((m) => ({
@@ -82,13 +86,68 @@ function mix(a: string, b: string, t: number) {
   return `rgb(${pa.map((v, i) => Math.round(v + (pb[i] - v) * t)).join(" ")})`
 }
 
+const PER_PERIOD = TICK_MS / 1000
+// Read when the app starts: the dashboard rewrites the query string from its own state soon after.
+const CAPTURE =
+  typeof location !== "undefined" &&
+  new URLSearchParams(location.search).has("capture")
+const REDUCED =
+  typeof matchMedia !== "undefined" &&
+  matchMedia("(prefers-reduced-motion: reduce)").matches
+
+/**
+ * The day on video, locked to the dashboard's clock: while the clock runs the video runs beside
+ * it and is pulled back into step if it drifts; when the clock stops, it parks in the middle of
+ * the half-hour on screen, so the light always matches the figures under it.
+ */
+function DayVideo({
+  theme,
+  period,
+  playing,
+}: {
+  theme: "dark" | "light"
+  period: number
+  playing: boolean
+}) {
+  const video = useRef<HTMLVideoElement>(null)
+  const [shown, setShown] = useState(false)
+
+  useEffect(() => {
+    const v = video.current
+    if (!v) return
+    const at = period * PER_PERIOD
+    if (playing) {
+      if (v.paused || Math.abs(v.currentTime - at) > 0.3) v.currentTime = at
+      v.play().catch(() => undefined)
+    } else {
+      v.pause()
+      v.currentTime = at + PER_PERIOD / 2
+    }
+  }, [period, playing])
+
+  return (
+    <video
+      ref={video}
+      src={`/scene-${theme}-tall.mp4`}
+      muted
+      playsInline
+      loop
+      preload="auto"
+      aria-hidden="true"
+      onPlaying={() => setShown(true)}
+      onSeeked={() => setShown(true)}
+      className={`pointer-events-none absolute inset-0 size-full object-cover transition-opacity duration-700 ${shown ? "opacity-100" : "opacity-0"}`}
+    />
+  )
+}
+
 const SKY = {
   dark: { day: "#24365f", dusk: "#4a2f2a", night: "#141a33" },
   light: { day: "#dfe8ff", dusk: "#ffe4cc", night: "#c9d1ec" },
 }
 
 export function SceneStage({ fallback }: { fallback: ReactNode }) {
-  const { period } = useGrid()
+  const { period, playing } = useGrid()
   const dark = useDark()
   const phone = usePhone()
   const [live, setLive] = useState(false)
@@ -134,13 +193,16 @@ export function SceneStage({ fallback }: { fallback: ReactNode }) {
           className={`pointer-events-none absolute inset-0 size-full object-cover transition-opacity duration-700 ${ready ? "opacity-0" : "opacity-100"}`}
         />
       ) : null}
+      {phone && !live && !CAPTURE && !REDUCED ? (
+        <DayVideo key={theme} theme={theme} period={period} playing={playing} />
+      ) : null}
       {live ? (
         <div
           className={`absolute inset-0 transition-opacity duration-700 ${ready ? "opacity-100" : "opacity-0"}`}
         >
           <SceneBoundary>
             <Suspense fallback={null}>
-              <RegionScene onReady={() => setReady(true)} />
+              <RegionScene onReady={() => setReady(true)} capture={CAPTURE} />
             </Suspense>
           </SceneBoundary>
         </div>

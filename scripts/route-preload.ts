@@ -41,7 +41,7 @@ export function routePreload(routes: Record<string, string>): Plugin {
         const script =
           `(function(){var f=${JSON.stringify(map)}[location.pathname.replace(/\\/$/,"")];` +
           `if(f)f.forEach(function(s){var l=document.createElement("link");l.rel="modulepreload";l.href="/"+s;document.head.appendChild(l)})})()`
-        return [{ tag: "script", children: script, injectTo: "head-prepend" }]
+        return [{ tag: "script", children: script, injectTo: "head" }]
       },
     },
   }

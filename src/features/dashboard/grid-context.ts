@@ -1,7 +1,16 @@
 import { createContext } from "react"
 
 import type { Period, Scenario } from "@/lib/grid/dispatch"
+import type { Transient } from "@/lib/grid/frequency"
 import type { Unit } from "@/lib/grid/units"
+
+/** The most recent unit taken out while it was generating, and what the frequency did. */
+export type TripEvent = {
+  readonly unit: Unit
+  readonly transient: Transient
+  /** `performance.now()` when it happened, so an instrument can replay it from the start. */
+  readonly at: number
+}
 
 /**
  * Everything the page knows, in one object.
@@ -29,6 +38,7 @@ export type Grid = {
   readonly periods: readonly Period[]
   readonly now: Period
   readonly units: readonly Unit[]
+  readonly lastTrip: TripEvent | null
 }
 
 export const GridContext = createContext<Grid | null>(null)
